@@ -43,7 +43,7 @@ const app = express();
 
 // CORS configuration - allow both production and local development
 const allowedOrigins = [
-  "https://stage-ghofrane.web.app",
+  "https://frontend-oviv.onrender.com", // Frontend Render
   "http://localhost:3000",
   process.env.FRONTEND_URL || ""
 ].filter(url => url !== "");
