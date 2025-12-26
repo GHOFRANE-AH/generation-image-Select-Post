@@ -97,7 +97,7 @@ function App() {
   const handleSignup = async (e) => {
     e.preventDefault();
 
-    const res = await fetch("`${API_URL}/signup", {
+    const res = await fetch(API_URL/"signup", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(formData),
@@ -110,7 +110,7 @@ function App() {
   const handleLogin = async (e) => {
     e.preventDefault();
 
-    const res = await fetch("`${API_URL}/login", {
+    const res = await fetch(API_URL/"login", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email: formData.email, password: formData.password }),
@@ -374,7 +374,7 @@ function App() {
     const selectedUrl = images[selectedImageIndex];
 
     try {
-      const res = await fetch("`${API_URL}/selection", {
+      const res = await fetch(API_URL/"selection", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -626,7 +626,7 @@ function App() {
     setLabLoading(true);
     try {
       // 1. Analyser le post
-      const res = await fetch("`${API_URL}/post/analyze", {
+      const res = await fetch(API_URL/"post/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -698,7 +698,7 @@ function App() {
       }
 
       // Sélectionner les 4 meilleures images (l'endpoint /select récupère automatiquement depuis Firestore)
-      const res = await fetch("`${API_URL}/select", {
+      const res = await fetch(API_URL/"select", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -754,7 +754,7 @@ function App() {
     setLabLoading(true);
     try {
       // Sélectionner les 4 meilleures images avec le nouveau prompt optimal
-      const res = await fetch("`${API_URL}/select-optimal", {
+      const res = await fetch(API_URL/"select-optimal", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -823,7 +823,7 @@ function App() {
     }
 
     try {
-      const res = await fetch("`${API_URL}/select/save", {
+      const res = await fetch(API_URL/"select/save", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
