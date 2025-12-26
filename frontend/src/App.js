@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 
 import "./App.css";
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
 
 function App() {
   const [mode, setMode] = useState("login");
@@ -96,7 +97,7 @@ function App() {
   const handleSignup = async (e) => {
     e.preventDefault();
 
-    const res = await fetch("http://localhost:5000/signup", {
+    const res = await fetch("`${API_URL}/signup", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(formData),
@@ -109,7 +110,7 @@ function App() {
   const handleLogin = async (e) => {
     e.preventDefault();
 
-    const res = await fetch("http://localhost:5000/login", {
+    const res = await fetch("`${API_URL}/login", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email: formData.email, password: formData.password }),
@@ -186,7 +187,7 @@ function App() {
       setLabCurrentImageIndex(0);
 
       try {
-        const imagesRes = await fetch(`http://localhost:5000/gallery/lab/${encodeURIComponent(user.email)}`, {
+        const imagesRes = await fetch(`${API_URL}/gallery/lab/${encodeURIComponent(user.email)}`, {
           method: "GET",
           headers: { "Content-Type": "application/json" },
         });
@@ -316,7 +317,7 @@ function App() {
               numberOfImages: desiredCount,
             };
 
-      const res = await fetch(`http://localhost:5000/${endpoint}`, {
+      const res = await fetch(`${API_URL}/${endpoint}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
@@ -373,7 +374,7 @@ function App() {
     const selectedUrl = images[selectedImageIndex];
 
     try {
-      const res = await fetch("http://localhost:5000/selection", {
+      const res = await fetch("`${API_URL}/selection", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -552,7 +553,7 @@ function App() {
 
     setLabLoading(true);
     try {
-      const res = await fetch("http://localhost:5000/ingest", {
+      const res = await fetch("`${API_URL}/ingest", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -565,7 +566,7 @@ function App() {
       if (data.success) {
         // Après le fetching, recharger les images depuis Firestore pour avoir toutes les données complètes
         try {
-          const imagesRes = await fetch(`http://localhost:5000/gallery/lab/${encodeURIComponent(user?.email || "anonymous")}`, {
+          const imagesRes = await fetch(`${API_URL}/gallery/lab/${encodeURIComponent(user?.email || "anonymous")}`, {
             method: "GET",
             headers: { "Content-Type": "application/json" },
           });
@@ -625,7 +626,7 @@ function App() {
     setLabLoading(true);
     try {
       // 1. Analyser le post
-      const res = await fetch("http://localhost:5000/post/analyze", {
+      const res = await fetch("`${API_URL}/post/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -659,7 +660,7 @@ function App() {
       // Si la galerie locale est vide, récupérer les images depuis Firestore d'abord
       if (labImages.length === 0) {
         try {
-          const imagesRes = await fetch(`http://localhost:5000/gallery/lab/${encodeURIComponent(user?.email || "anonymous")}`, {
+          const imagesRes = await fetch(`${API_URL}/gallery/lab/${encodeURIComponent(user?.email || "anonymous")}`, {
             method: "GET",
             headers: { "Content-Type": "application/json" },
           });
@@ -697,7 +698,7 @@ function App() {
       }
 
       // Sélectionner les 4 meilleures images (l'endpoint /select récupère automatiquement depuis Firestore)
-      const res = await fetch("http://localhost:5000/select", {
+      const res = await fetch("`${API_URL}/select", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -753,7 +754,7 @@ function App() {
     setLabLoading(true);
     try {
       // Sélectionner les 4 meilleures images avec le nouveau prompt optimal
-      const res = await fetch("http://localhost:5000/select-optimal", {
+      const res = await fetch("`${API_URL}/select-optimal", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -822,7 +823,7 @@ function App() {
     }
 
     try {
-      const res = await fetch("http://localhost:5000/select/save", {
+      const res = await fetch("`${API_URL}/select/save", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -863,7 +864,7 @@ function App() {
       return;
     }
 
-    const res = await fetch(`http://localhost:5000/delete/${user.email}`, {
+    const res = await fetch(`${API_URL}/delete/${user.email}`, {
       method: "DELETE",
       headers: { Authorization: `Bearer ${token}` },
     });

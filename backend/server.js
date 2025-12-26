@@ -7,7 +7,7 @@ const jwt = require("jsonwebtoken");
 const admin = require("firebase-admin");
 // node-fetch v3 is ESM; use a tiny wrapper so fetch works in CommonJS
 const fetch = (...args) => import("node-fetch").then(({ default: fetchFn }) => fetchFn(...args));
-const serviceAccount = require("./config/serviceAccountKey.json");
+//const serviceAccount = require("./config/serviceAccountKey.json");
 
 // Taxonomie fermée et validation
 const {
@@ -27,9 +27,12 @@ const {
 
 
 admin.initializeApp({
-  credential: admin.credential.cert(serviceAccount),
+  credential: admin.credential.cert({
+    projectId: process.env.FIREBASE_PROJECT_ID,
+    clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+    privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, "\n"),
+  }),
   storageBucket: process.env.FIREBASE_STORAGE_BUCKET,
-  projectId: serviceAccount.project_id,
 });
 
 const { getStorage } = require("firebase-admin/storage");
@@ -40,9 +43,10 @@ const app = express();
 
 // CORS configuration - allow both production and local development
 const allowedOrigins = [
-  "https://stage-ghofrane.web.app", // production
-  "http://localhost:3000" // local development
-];
+  "https://stage-ghofrane.web.app",
+  "http://localhost:3000",
+  process.env.FRONTEND_URL || ""
+].filter(url => url !== "");
 
 app.use(cors({
   origin: function (origin, callback) {
