@@ -36,7 +36,7 @@ admin.initializeApp({
 });
 
 const { getStorage } = require("firebase-admin/storage");
-const bucket = getStorage().bucket();
+const bucket = getStorage().bucket("stage-ghofrane.firebasestorage.app");
 
 const db = admin.firestore();
 const app = express();
@@ -1404,6 +1404,65 @@ app.delete("/image/:imageId", async (req, res) => {
 
 // ---------------------- HELPER: Générer tags automatiquement pour une image ----------------------
 /**
+ * Complète les tags à 8 minimum et limite à 20 maximum
+ * Si moins de 8 tags, complète avec des tags par défaut de la taxonomie
+ * @param {string[]} tags - Tags existants
+ * @returns {string[]} Tags complétés/limités
+ */
+const ensureTagsCount = (tags) => {
+  const MIN_TAGS = 8;
+  const MAX_TAGS = 20;
+  
+  let finalTags = [...tags];
+  
+  // Limiter à 20 tags maximum
+  if (finalTags.length > MAX_TAGS) {
+    finalTags = finalTags.slice(0, MAX_TAGS);
+    console.log(`⚠️ Tags limités à ${MAX_TAGS} (${tags.length} → ${MAX_TAGS})`);
+  }
+  
+  // Compléter à 8 tags minimum avec des tags par défaut valides de la taxonomie
+  if (finalTags.length < MIN_TAGS) {
+    // Obtenir tous les tags valides de la taxonomie
+    const allValidTags = getAllValidTags();
+    
+    // Tags par défaut préférés (doivent être valides dans la taxonomie)
+    const preferredDefaults = [
+      "visual",
+      "graphic",
+      "professional_visual",
+      "content",
+      "marketing",
+      "business",
+      "design",
+      "presentation"
+    ];
+    
+    // Filtrer les tags par défaut pour ne garder que ceux qui sont valides et non déjà présents
+    const validDefaults = preferredDefaults.filter(tag => 
+      isValidTag(tag) && !finalTags.includes(tag)
+    );
+    
+    // Ajouter les tags par défaut valides jusqu'à atteindre MIN_TAGS
+    const tagsToAdd = MIN_TAGS - finalTags.length;
+    const selectedDefaults = validDefaults.slice(0, tagsToAdd);
+    finalTags = [...finalTags, ...selectedDefaults];
+    
+    // Si on n'a toujours pas assez, utiliser d'autres tags valides de la taxonomie
+    if (finalTags.length < MIN_TAGS) {
+      const additionalTags = allValidTags
+        .filter(tag => !finalTags.includes(tag))
+        .slice(0, MIN_TAGS - finalTags.length);
+      finalTags = [...finalTags, ...additionalTags];
+    }
+    
+    console.log(`⚠️ Tags complétés à ${MIN_TAGS} (${tags.length} → ${finalTags.length})`);
+  }
+  
+  return finalTags;
+};
+
+/**
  * Génère des tags enrichis pour une image en prenant en compte :
  * - L'analyse visuelle de l'image
  * - Le contexte de la source (ex. post LinkedIn, visuel professionnel)
@@ -1501,7 +1560,7 @@ Retourne un JSON strict (sans texte autour), conforme au schéma :
 - NE JAMAIS copier la même description pour plusieurs images
 
 ✅ RÈGLES OBLIGATOIRES :
-- t (tags) : EXACTEMENT 10 tags, UNIQUES à cette image spécifique, basés UNIQUEMENT sur ce qui est VISIBLEMENT PRÉSENT.
+- t (tags) : Entre 8 et 20 tags, UNIQUES à cette image spécifique, basés UNIQUEMENT sur ce qui est VISIBLEMENT PRÉSENT.
   - Analyse l'image en détail : objets, actions, scènes, couleurs, compositions
   - Choisis les tags les plus SPÉCIFIQUES possibles selon ce que tu vois RÉELLEMENT
   - Si tu vois un logo → tag "logo"
@@ -1512,6 +1571,7 @@ Retourne un JSON strict (sans texte autour), conforme au schéma :
   - 0 ou 1 tag "industrie" UNIQUEMENT si une industrie spécifique est identifiable
   - Analyse en profondeur : couleurs, formes, textures, compositions, actions, objets secondaires pour identifier tous les tags pertinents
   - NE JAMAIS inventer des éléments qui ne sont pas visibles
+  - Génère entre 8 et 20 tags selon ce que tu observes dans l'image
 - d (description) : UNE phrase UNIQUE et SPÉCIFIQUE décrivant EXACTEMENT ce que tu VOIS dans cette image précise. 
   - Décris UNIQUEMENT les éléments visuels concrets VISIBLES : objets, personnes, actions, scènes, couleurs dominantes
   - Si tu vois un logo, mentionne-le dans la description
@@ -1619,7 +1679,7 @@ Retourne uniquement le JSON final avec des tags et une description UNIQUES pour 
           // Validation et contrôle qualité
           const tagsCount = Array.isArray(taggingData.t) ? taggingData.t.length : 0;
           
-          // Accepter n'importe quel nombre de tags (la validation complétera à 10 automatiquement)
+          // Accepter n'importe quel nombre de tags (ensureTagsCount appliquera la plage 8-20)
           // Plus de vérification stricte du nombre de tags, seulement si aucun tag
           if (tagsCount === 0) {
             if (attempt < maxAttempts) {
@@ -1640,7 +1700,7 @@ Retourne uniquement le JSON final avec des tags et une description UNIQUES pour 
                       content: `Tu es un classificateur d'images pour une banque d'images marketing B2B.
 
 ⚠️ CRITIQUE ABSOLUE : 
-- Tu DOIS générer entre 5 et 12 tags dans le champ "t". Un tableau vide n'est PAS accepté.
+- Tu DOIS générer entre 8 et 20 tags dans le champ "t". Un tableau vide n'est PAS accepté.
 - Chaque image DOIT avoir ses propres tags UNIQUES basés EXCLUSIVEMENT sur ce qui est visible dans l'image.
 - JAMAIS de tags génériques "professional", "business" ou "office" comme fallback.
 - Chaque description "d" DOIT être UNIQUE et SPÉCIFIQUE à cette image précise.
@@ -1665,7 +1725,7 @@ Retourne un JSON strict (sans texte autour), conforme au schéma :
 {
   "id": string,          // identifiant unique de l'image
   "u": string,           // URL ou storage key
-  "t": string[],         // liste compacte de tags - OBLIGATOIRE : 5 à 12 tags UNIQUES, JAMAIS vide
+  "t": string[],         // liste compacte de tags - OBLIGATOIRE : 8 à 20 tags UNIQUES, JAMAIS vide
   "p": 0|1|2,            // présence de personnes
   "s": "photo"|"illu"|"3d"|"icon",  // style de l'image
   "x": string[],         // exclusions
@@ -1681,13 +1741,13 @@ Retourne un JSON strict (sans texte autour), conforme au schéma :
 - NE JAMAIS copier la même description pour plusieurs images
 
 ✅ RÈGLES OBLIGATOIRES :
-- t (tags) : OBLIGATOIREMENT 5 à 12 tags max, UNIQUES à cette image spécifique, basés UNIQUEMENT sur ce qui est visible.
+- t (tags) : OBLIGATOIREMENT 8 à 20 tags, UNIQUES à cette image spécifique, basés UNIQUEMENT sur ce qui est visible.
   - Analyse l'image en détail : objets, actions, scènes, couleurs, compositions, textures, formes
   - Choisis les tags les plus SPÉCIFIQUES possibles selon ce que tu vois réellement
   - 1 à 2 tags de "sujet business" UNIQUEMENT si visible et pertinent dans l'image
   - 2 à 6 tags "objets/visuels" basés sur les éléments CONCRETS visibles
   - 0 ou 1 tag "industrie" UNIQUEMENT si une industrie spécifique est identifiable
-  - Si tu ne peux pas identifier 5 tags spécifiques, analyse PLUS EN PROFONDEUR :
+  - Si tu ne peux pas identifier 8 tags spécifiques, analyse PLUS EN PROFONDEUR :
     * Regarde les objets secondaires, les arrière-plans, les textures, les couleurs dominantes
     * Identifie les actions ou interactions visibles
     * Note les compositions, les perspectives, les styles visuels
@@ -1785,11 +1845,10 @@ Retourne uniquement le JSON final avec des tags UNIQUES dans "t" (autant que né
             throw new Error(`Exclusions invalides: ${taggingData.x?.length || 0} exclusions (max: 4)`);
           }
           
-          // Validation des tags (accepte tous les tags maintenant, complète à 10 si nécessaire)
+          // Validation des tags
           const tagsValidation = validateTags(taggingData.t || []);
-          // Toujours utiliser les tags validés (complétés automatiquement à 10 tags)
-          // Plus d'avertissement car tous les tags sont acceptés maintenant
-          taggingData.t = tagsValidation.validTags;
+          // Appliquer la logique 8-20 tags : compléter à 8 minimum, limiter à 20 maximum
+          taggingData.t = ensureTagsCount(tagsValidation.validTags);
           
           // ⚠️ CRITIQUE : Si aucun tag valide, relancer la génération
           // Mais seulement si ce n'est pas la dernière tentative
@@ -1811,7 +1870,7 @@ Retourne uniquement le JSON final avec des tags UNIQUES dans "t" (autant que né
                         content: `Tu es un classificateur d'images pour une banque d'images marketing B2B.
 
 ⚠️ CRITIQUE ABSOLUE : 
-- Tu DOIS générer entre 5 et 12 tags dans le champ "t". Un tableau vide n'est PAS accepté.
+- Tu DOIS générer entre 8 et 20 tags dans le champ "t". Un tableau vide n'est PAS accepté.
 - Chaque image DOIT avoir ses propres tags UNIQUES basés EXCLUSIVEMENT sur ce qui est visible dans l'image.
 - JAMAIS de tags génériques "professional", "business" ou "office" comme fallback.
 - Chaque description "d" DOIT être UNIQUE et SPÉCIFIQUE à cette image précise.
@@ -1845,10 +1904,10 @@ Retourne un JSON strict (sans texte autour), conforme au schéma :
 }
 
 **Règles CRITIQUES :**
-- t (tags) : 1 à 12 tags max, UNIQUES à cette image, basés UNIQUEMENT sur ce qui est visible, et UNIQUEMENT dans la taxonomie fournie.
+- t (tags) : 8 à 20 tags, UNIQUES à cette image, basés UNIQUEMENT sur ce qui est visible, et UNIQUEMENT dans la taxonomie fournie.
 - d (description) : UNE phrase UNIQUE et SPÉCIFIQUE décrivant exactement ce que montre cette image précise.
 - Analyse l'image en détail et choisis les tags les plus SPÉCIFIQUES possibles selon ce que tu vois réellement.
-- Si tu ne peux pas identifier 5 tags spécifiques, analyse plus en profondeur : couleurs, formes, textures, compositions, actions, objets secondaires.
+- Si tu ne peux pas identifier 8 tags spécifiques, analyse plus en profondeur : couleurs, formes, textures, compositions, actions, objets secondaires.
 
 Retourne uniquement le JSON final avec des tags UNIQUES dans "t" (autant que nécessaire, tous dans la taxonomie) et une description UNIQUE dans "d" pour cette image spécifique.`
                       },
@@ -1887,6 +1946,8 @@ Retourne uniquement le JSON final avec des tags UNIQUES dans "t" (autant que né
           // Optimiser et réordonner les tags selon les priorités
           // Priorité: sujets business > contexte professionnel > éléments visuels
           taggingData.t = optimizeAndReorderTags(taggingData.t);
+          // Réappliquer ensureTagsCount après optimisation pour garantir la plage 8-20
+          taggingData.t = ensureTagsCount(taggingData.t);
 
           // Valider le style
           const styleValidation = validateStyle(taggingData.s || "photo");
@@ -1947,7 +2008,7 @@ Retourne uniquement le JSON final avec des tags UNIQUES dans "t" (autant que né
                         content: `Tu es un classificateur d'images pour une banque d'images marketing B2B.
 
 ⚠️ CRITIQUE ABSOLUE : 
-- Tu DOIS générer entre 5 et 12 tags dans le champ "t". Un tableau vide n'est PAS accepté.
+- Tu DOIS générer entre 8 et 20 tags dans le champ "t". Un tableau vide n'est PAS accepté.
 - Chaque image DOIT avoir ses propres tags UNIQUES basés EXCLUSIVEMENT sur ce qui est visible dans l'image.
 - JAMAIS de tags génériques "professional", "business" ou "office" comme fallback.
 - Chaque description "d" DOIT être UNIQUE et SPÉCIFIQUE à cette image précise.
@@ -1981,7 +2042,7 @@ Retourne un JSON strict (sans texte autour), conforme au schéma :
 }
 
 **Règles CRITIQUES :**
-- t (tags) : 1 à 12 tags max, UNIQUES à cette image, basés UNIQUEMENT sur ce qui est visible, et UNIQUEMENT dans la taxonomie fournie.
+- t (tags) : 8 à 20 tags, UNIQUES à cette image, basés UNIQUEMENT sur ce qui est visible, et UNIQUEMENT dans la taxonomie fournie.
 - d (description) : UNE phrase UNIQUE et SPÉCIFIQUE décrivant exactement ce que montre cette image précise. Décris les éléments visuels concrets : objets, personnes, actions, scènes, couleurs dominantes, compositions. Jamais de description générique.
 
 Retourne uniquement le JSON final avec des tags UNIQUES dans "t" (autant que nécessaire, tous dans la taxonomie) et une description UNIQUE dans "d" pour cette image spécifique.`
@@ -3008,46 +3069,53 @@ app.post("/tag/batch", async (req, res) => {
                     content: [
                       {
                         type: "text",
-                        text: `Analyze the following image and generate EXACTLY 10 precise tags that describe ONLY what you actually SEE in the image.
-
-⚠️ ABSOLUTE CRITICAL RULES - READ CAREFULLY:
-1. Describe ONLY what is VISIBLY PRESENT in the image
-2. NEVER invent, interpret, or assume anything not clearly visible
-3. NEVER add tags based on what you THINK the image represents
-4. If you see a logo, tag it as "logo" - DO NOT exclude it
-5. If you see arrows/flèches, tag them as "arrow" or "arrows" - DO NOT exclude them
-6. If you see text, tag it as "text" - DO NOT exclude it
-7. Be 100% factual and objective - only describe visible reality
+                        text: `Analyze the following image and generate a list of precise, short, and relevant tags that describe its content.
 
 The tags must be in ENGLISH ONLY. All tags must be English words.
 
-For this image, provide EXACTLY 10 tags (no more, no less):
-- Comma-separated list of tags
-- NO sentences, NO comments, NO categories
-- Only describe what you ACTUALLY SEE
+The tags must allow a tool like Lyter to automatically select the most suitable image to illustrate a professional post.
 
-Tags must describe ONLY visible elements:
-- Visible objects (what is actually shown: person, computer, logo, arrow, text, etc.)
-- Visible environment (what place is visible: office, outdoor, indoor, etc.)
-- Visible actions (what actions are visible: sitting, standing, pointing, etc.)
-- Visible composition (how elements are arranged - visible only)
-- Visible style (colors, lighting visible in the image)
+For this image, provide ONLY:
+- a comma-separated list of tags
+- NO sentences
+- NO comments
+- NO categories
+- maximum 20 tags
+- minimum 8 tags
 
-You MUST include tags about what you SEE:
-- Image type: portrait, selfie, product, scene, office, outdoor, indoor (only if visible)
-- Visible objects: computer, cup, phone, document, screen, logo, arrow, text (only if visible)
-- Visible setting: office, nature, street, transport, coworking, studio (only if visible)
-- Visible characteristics: colors, lighting, style (only if visible)
+CRITICAL: Describe ONLY what you SEE in the image. Do NOT interpret, assume, or invent anything that is not clearly visible.
 
-CRITICAL EXAMPLES:
-- If you see a logo → tag "logo" (DO NOT exclude it)
-- If you see arrows → tag "arrow" or "arrows" (DO NOT exclude them)
-- If you see text → tag "text" (DO NOT exclude it)
-- If you see a person → tag "person" or "portrait"
-- If you DON'T see something → DON'T tag it
+The tags must describe ONLY visible elements:
+- visible elements (what is actually shown)
+- context (what environment is visible)
+- mood/atmosphere (what feeling is conveyed by visible elements)
+- actions (what actions are visible)
+- location (what place is visible)
+- main subject (what main object/person is visible)
+- general composition (how elements are arranged - visible only)
+- visual style (colors, lighting, style - visible only)
+
+You MUST include tags about:
+- image type: portrait, selfie, product, scene, office, outdoor, indoor
+- tone: serious, casual, dynamic, inspiring (based on visible elements only)
+- situation: meeting, computer, walking, presentation, reflection (what is visible)
+- setting: office, nature, street, transport, coworking, studio (what is visible)
+- visible objects: computer, cup, phone, document, screen (only if visible)
+- visual characteristics: soft light, blurred background, warm colors, natural style (only if visible)
+
+CRITICAL RULES:
+- NEVER invent elements that are not visible
+- NEVER interpret the image's intention or meaning
+- NEVER assume what is happening beyond what you see
+- Describe ONLY what is actually visible in the image
+- All tags must be in ENGLISH
+- Use simple English words, NO underscores, NO hyphens, NO compound words with underscores
+- Examples of CORRECT tags: "portrait", "confident", "modern office", "professional look", "young man", "natural lighting", "casual style", "positive atmosphere", "blurred background", "white shirt"
+- Examples of INCORRECT tags: "portrait_confiant", "bureau_modern", "look_professionnel" (NO underscores, NO French words)
+- Be objective and factual - only describe visible reality
 
 At the end, generate this output:
-**Tags.** tag1, tag2, tag3, tag4, tag5, tag6, tag7, tag8, tag9, tag10`,
+**Tags.** tag1, tag2, tag3, tag4, etc.`,
                       },
                       {
                         type: "image_url",
@@ -3136,22 +3204,12 @@ At the end, generate this output:
                   return normalized;
                 });
               
-              // S'assurer qu'on a exactement 10 tags
-              if (tags.length < 10) {
-                console.warn(`⚠️ Less than 10 tags generated for image ${imageId}, adding default tags`);
-                const defaultTags = ["portrait", "professional", "office", "serious", "indoor", "computer", "work", "modern", "business", "person"];
-                // Ajouter des tags par défaut jusqu'à atteindre 10
-                while (tags.length < 10) {
-                  const tagToAdd = defaultTags[tags.length % defaultTags.length];
-                  if (!tags.includes(tagToAdd)) {
-                    tags.push(tagToAdd);
-                  } else {
-                    tags.push(`tag${tags.length + 1}`);
-                  }
-                }
-              } else if (tags.length > 10) {
-                console.warn(`⚠️ More than 10 tags generated for image ${imageId}, keeping first 10`);
-                tags = tags.slice(0, 10);
+              // S'assurer qu'on a entre 8 et 20 tags
+              if (tags.length < 8) {
+                console.warn(`⚠️ Less than 8 tags generated for image ${imageId}, using default tags`);
+                tags = ["portrait", "professional", "office", "serious", "indoor", "computer", "work", "modern"];
+              } else if (tags.length > 20) {
+                tags = tags.slice(0, 20);
               }
               
               // Générer le contexte basé sur les tags
@@ -3205,26 +3263,26 @@ At the end, generate this output:
             } catch (parseErr) {
               console.error(`Erreur parsing tags pour image ${imageId}:`, parseErr);
               console.log(`Texte reçu: ${analysisText.substring(0, 300)}...`);
-              // Fallback: varied tags based on index to avoid repetition (exactement 10 tags)
+              // Fallback: varied tags based on index to avoid repetition
               const fallbackTags = [
-                ["portrait", "professional", "office", "serious", "indoor", "computer", "work", "modern", "business", "person"],
-                ["selfie", "casual", "smiling", "relaxed", "personal", "natural", "authentic", "friendly", "young", "outdoor"],
-                ["portrait", "formal", "office", "meeting", "collaboration", "team", "professional", "serious", "indoor", "group"],
-                ["portrait", "team", "collaboration", "office", "work", "dynamic", "professional", "modern", "business", "meeting"],
-                ["portrait", "event", "networking", "professional", "presentation", "scene", "public", "inspiring", "crowd", "speaker"],
+                ["portrait", "professional", "office", "serious", "indoor", "computer", "work", "modern"],
+                ["selfie", "casual", "smiling", "relaxed", "personal", "natural", "authentic", "friendly"],
+                ["portrait", "formal", "office", "meeting", "collaboration", "team", "professional", "serious"],
+                ["portrait", "team", "collaboration", "office", "work", "dynamic", "professional", "modern"],
+                ["portrait", "event", "networking", "professional", "presentation", "scene", "public", "inspiring"],
               ];
               tags = fallbackTags[imageIds.indexOf(imageId) % fallbackTags.length];
               context = { location: "indoor", formality: "formal", ambiance: "neutral", hasFace: true };
             }
           } catch (err) {
             console.error(`Error analyzing image ${imageId}:`, err);
-            // Default tags (exactement 10)
-            tags = ["portrait", "face", "person", "indoor", "professional", "serious", "modern", "business", "office", "work"];
+            // Default tags
+            tags = ["portrait", "face"];
             context = { location: "indoor", formality: "formal" };
           }
         } else {
-          // Default tags if no OpenAI API (exactement 10)
-          tags = ["portrait", "professional", "face", "person", "indoor", "serious", "modern", "business", "office", "work"];
+          // Default tags if no OpenAI API
+          tags = ["portrait", "professional", "face"];
           context = { location: "indoor", formality: "formal", ambiance: "neutral" };
         }
 
@@ -3255,6 +3313,7 @@ At the end, generate this output:
     res.status(500).json({ success: false, message: "Erreur lors du tagging." });
   }
 });
+
 
 // ---------------------- LAB MODE: TAG SINGLE (Tagging d'une seule image pour test) ----------------------
 app.post("/tag/single", async (req, res) => {
@@ -4986,7 +5045,7 @@ IMPORTANT :
 });
 
 // ---------------------- LAB MODE: SELECT OPTIMAL (Sélection optimale avec nouveau prompt) ----------------------
-/// ---------------------- LAB MODE: SELECT OPTIMAL (Sélection optimale AMÉLIORÉE) ----------------------
+// ---------------------- LAB MODE: SELECT OPTIMAL (Sélection optimale AMÉLIORÉE) ----------------------
 app.post("/select-optimal", async (req, res) => {
   try {
     const { email, postText } = req.body;
@@ -5394,6 +5453,7 @@ ${JSON.stringify(imagesCompact, null, 2)}
     });
   }
 });
+
 // ---------------------- LAB MODE: SAVE SELECTED IMAGE (Enregistrer l'image choisie par l'utilisateur) ----------------------
 app.post("/select/save", async (req, res) => {
   try {

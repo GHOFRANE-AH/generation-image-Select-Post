@@ -1448,40 +1448,17 @@ const validateTags = (tags) => {
     }
   });
   
-  // Vérifier le nombre de tags et compléter automatiquement à 10 si nécessaire
+  // Vérifier qu'il y a au moins un tag valide
   if (validTags.length === 0) {
     errors.push(`No valid tags found`);
   }
   
-  // Tags par défaut pour compléter si nécessaire
-  const defaultTags = [
-    "portrait", "professional", "office", "serious", "indoor", 
-    "computer", "work", "modern", "business", "person",
-    "team", "meeting", "casual", "formal", "smiling",
-    "workspace", "laptop", "screen", "presentation", "group"
-  ];
-  
-  // Compléter à 10 tags si nécessaire
-  while (validTags.length < 10) {
-    const tagToAdd = defaultTags.find(tag => !validTags.includes(tag));
-    if (tagToAdd) {
-      validTags.push(tagToAdd);
-    } else {
-      // Si tous les tags par défaut sont déjà utilisés, utiliser des tags génériques
-      validTags.push(`tag${validTags.length + 1}`);
-    }
-  }
-  
-  // Tronquer à 10 tags si plus de 10
-  if (validTags.length > 10) {
-    validTags.splice(10);
-  }
-  
-  // Toujours valide si on a exactement 10 tags
+  // Ne plus forcer exactement 10 tags - laisser ensureTagsCount dans server.js gérer la plage 8-20
+  // Retourner les tags validés tels quels (sans complétion ni troncature)
   return {
-    valid: validTags.length === 10,
+    valid: validTags.length > 0,
     errors: errors,
-    validTags: validTags.slice(0, 10), // Garantir exactement 10 tags
+    validTags: validTags, // Retourner les tags tels quels, sans forcer un nombre spécifique
     invalidTags
   };
 };
@@ -1621,31 +1598,9 @@ const optimizeAndReorderTags = (tags) => {
     ...uniqueIndustryTags            // 0-1 tag industry
   ];
   
-  // Garantir exactement 10 tags
-  const defaultTags = [
-    "portrait", "professional", "office", "serious", "indoor", 
-    "computer", "work", "modern", "business", "person",
-    "team", "meeting", "casual", "formal", "smiling",
-    "workspace", "laptop", "screen", "presentation", "group"
-  ];
-  
-  // Si moins de 10 tags, ajouter des tags par défaut
-  while (result.length < 10) {
-    const tagToAdd = defaultTags.find(tag => !result.includes(tag));
-    if (tagToAdd) {
-      result.push(tagToAdd);
-    } else {
-      // Si tous les tags par défaut sont déjà utilisés, utiliser des tags génériques
-      result.push(`tag${result.length + 1}`);
-    }
-  }
-  
-  // Si plus de 10 tags, garder les 10 premiers (les plus prioritaires)
-  if (result.length > 10) {
-    result = result.slice(0, 10);
-  }
-  
-  return result; // Retourner exactement 10 tags
+  // Ne plus forcer exactement 10 tags - laisser ensureTagsCount dans server.js gérer la plage 8-20
+  // Retourner les tags optimisés tels quels (sans complétion ni troncature forcée)
+  return result; // Retourner les tags optimisés (peut être entre 0 et plus de 20)
 };
 
 // Fonction pour valider le style
