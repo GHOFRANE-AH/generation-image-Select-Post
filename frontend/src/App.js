@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 
 import "./App.css";
 
@@ -16,10 +16,28 @@ function App() {
   const [images, setImages] = useState([]);
   const [photos, setPhotos] = useState([]);
   const [style, setStyle] = useState("professional_indoor");
-  const [flowType, setFlowType] = useState("style"); // "style" | "auto"
+  const [flowType, setFlowType] = useState("style"); // "style" | "auto" | "lab"
   const [postText, setPostText] = useState("");
   const [postInputMode, setPostInputMode] = useState("manual"); // "select" | "manual"
   const [generatedPrompt, setGeneratedPrompt] = useState("");
+  
+  // Lab mode states
+  const [labData, setLabData] = useState({
+    prenom: "",
+    nom: "",
+    entreprise: "",
+    siteWeb: "",
+    linkedin: "",
+  });
+  const [labImages, setLabImages] = useState([]);
+  const [labPostText, setLabPostText] = useState("");
+  const [labAnalysis, setLabAnalysis] = useState(null);
+  const [labSelectedImage, setLabSelectedImage] = useState(null);
+  const [labTop3Images, setLabTop3Images] = useState([]);
+  const [labLoading, setLabLoading] = useState(false);
+  const [labCurrentImageIndex, setLabCurrentImageIndex] = useState(0);
+  const [labTop3CurrentIndex, setLabTop3CurrentIndex] = useState(0);
+  const [labStyle, setLabStyle] = useState("professional_indoor");
 
   // Posts LinkedIn prédéfinis pour les tests - Thèmes très différents
   const predefinedPosts = [
@@ -126,6 +144,7 @@ function App() {
     setPhotos(newPhotos);
   };
 
+
   // Ajustement auto-prompt
   React.useEffect(() => {
     if (flowType === "auto") {
@@ -136,8 +155,97 @@ function App() {
       if (numberOfImages !== 2) {
         setNumberOfImages(2);
       }
+    } else if (flowType === "style") {
+      // Style mode: reset to default if it was forced to 2 by auto mode
+      if (numberOfImages === 2) {
+        setNumberOfImages(3);
+      }
     }
-  }, [flowType, photos.length, numberOfImages]);
+  }, [flowType, photos.length]);
+
+  // Charger les images Lab quand le mode Lab est activé et que l'utilisateur est connecté
+  React.useEffect(() => {
+    // Toujours vider la galerie Lab quand on change de mode ou d'utilisateur
+    if (flowType !== "lab") {
+      setLabImages([]);
+      setLabCurrentImageIndex(0);
+      return;
+    }
+
+    const loadLabImages = async () => {
+      // Vérifier que l'utilisateur est connecté avec un email valide
+      if (!user?.email || user.email === "anonymous" || user.email === "user" || !user.email.includes("@")) {
+        console.log("ℹ️ Utilisateur non connecté ou email invalide. La galerie Lab sera vide.");
+        setLabImages([]);
+        setLabCurrentImageIndex(0);
+        return;
+      }
+
+      // Vider la galerie avant de charger pour éviter d'afficher d'anciennes données
+      setLabImages([]);
+      setLabCurrentImageIndex(0);
+
+      try {
+        const imagesRes = await fetch(`http://localhost:5000/gallery/lab/${encodeURIComponent(user.email)}`, {
+          method: "GET",
+          headers: { "Content-Type": "application/json" },
+        });
+        
+        if (!imagesRes.ok) {
+          // Si erreur HTTP (404, 500, etc.), considérer qu'il n'y a pas d'images
+          if (imagesRes.status === 404) {
+            console.log("ℹ️ Endpoint /gallery/lab/:email non trouvé. Le serveur backend doit être redémarré ou la route n'existe pas encore.");
+          }
+          setLabImages([]);
+          setLabCurrentImageIndex(0);
+          return;
+        }
+        
+        const imagesData = await imagesRes.json();
+        console.log(`📊 Réponse Firestore pour ${user.email}:`, {
+          success: imagesData.success,
+          count: imagesData.count || 0,
+          imagesLength: imagesData.images?.length || 0
+        });
+
+        if (imagesData.success && imagesData.images && Array.isArray(imagesData.images)) {
+          const labImagesFromFirestore = imagesData.images.map(img => ({
+            id: img.id,
+            u: img.u || img.url, // Schéma conforme : champ u
+            url: img.url || img.u, // Alias pour compatibilité
+            t: img.t || img.tags || [], // Schéma conforme : champ t
+            tags: img.tags || img.t || [], // Alias pour compatibilité
+            p: img.p ?? img.context?.p ?? 1, // Schéma conforme : champ p
+            s: img.s || img.context?.s || "photo", // Schéma conforme : champ s
+            x: img.x || img.context?.x || [], // Schéma conforme : champ x
+            d: img.d || img.context?.d || "Image visuelle professionnelle.", // Schéma conforme : champ d
+            source: img.source || "unknown",
+            created_at: img.created_at,
+            context: img.context || {}, // Garder pour compatibilité
+          }));
+          
+          setLabImages(labImagesFromFirestore);
+          if (labImagesFromFirestore.length > 0) {
+            setLabCurrentImageIndex(0);
+            console.log(`✅ Loaded ${labImagesFromFirestore.length} Lab images from Firestore for ${user.email}`);
+          } else {
+            console.log(`ℹ️ No Lab images found for ${user.email}. User needs to fetch visuals first.`);
+          }
+        } else {
+          console.log(`ℹ️ No valid Lab images in response for ${user.email}`);
+          setLabImages([]);
+          setLabCurrentImageIndex(0);
+        }
+      } catch (imgErr) {
+        console.error("Error loading Lab images from Firestore:", imgErr);
+        // En cas d'erreur réseau, s'assurer que la galerie est vide
+        setLabImages([]);
+        setLabCurrentImageIndex(0);
+      }
+    };
+
+    loadLabImages();
+  }, [flowType, user?.email]);
 
   // ---------------- GENERATE IMAGE ----------------
   const handleGenerate = async () => {
@@ -153,7 +261,7 @@ function App() {
 
     if (flowType === "auto") {
       if (!postText.trim()) {
-        alert("Ajoute le texte du post pour générer un prompt.");
+        alert("Add the post text to generate a prompt.");
         return;
       }
       if (photos.length < 1) {
@@ -190,6 +298,7 @@ function App() {
 
     try {
       const desiredCount = flowType === "auto" ? 2 : numberOfImages;
+      console.log(`[FRONTEND] Generating ${desiredCount} images (flowType: ${flowType}, numberOfImages: ${numberOfImages})`);
       const endpoint = flowType === "auto" ? "generate-auto" : "generate";
 
       const body =
@@ -226,8 +335,10 @@ function App() {
 
         // ✅ Correction : limiter au nombre exact demandé
         if (data.imageUrls && Array.isArray(data.imageUrls)) {
+          console.log(`[FRONTEND] Received ${data.imageUrls.length} images, limiting to ${desiredCount}`);
           const unique = Array.from(new Set(data.imageUrls));
           const limited = unique.slice(0, desiredCount);
+          console.log(`[FRONTEND] Setting ${limited.length} images in state`);
           setImages(limited);
         } else if (data.imageUrl || data.url) {
           setImages([data.imageUrl || data.url]);
@@ -250,12 +361,12 @@ function App() {
   // ---------------- SAVE SELECTED IMAGE ----------------
   const handleSaveSelection = async () => {
     if (!user?.email) {
-      alert("Connectez-vous pour sauvegarder une sélection.");
+      alert("Please log in to save a selection.");
       return;
     }
 
     if (selectedImageIndex === null) {
-      alert("Choisissez d'abord une image.");
+      alert("Please select an image first.");
       return;
     }
 
@@ -274,21 +385,142 @@ function App() {
       });
 
       const data = await res.json();
-      alert(data.message || "Sélection enregistrée.");
+      alert(data.message || "Selection saved.");
     } catch (err) {
       console.error(err);
-      alert("Erreur lors de la sauvegarde.");
+      alert("Error saving selection.");
     }
   };
 
   // ---------------- DOWNLOAD IMAGE ----------------
-  const handleDownloadImage = (imageUrl, index) => {
-    const link = document.createElement("a");
-    link.href = imageUrl;
-    link.download = `generated-image-${index + 1}-${Date.now()}.png`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+  const handleDownloadImage = async (imageUrl, imageIdOrIndex) => {
+    if (!imageUrl) {
+      alert("Image URL missing.");
+      return;
+    }
+
+    try {
+      // Si c'est une URL base64
+      if (imageUrl.startsWith("data:")) {
+        const link = document.createElement("a");
+        link.href = imageUrl;
+        const filename = typeof imageIdOrIndex === "string" 
+          ? `image-${imageIdOrIndex}.png`
+          : `generated-image-${(imageIdOrIndex || 0) + 1}-${Date.now()}.png`;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        setTimeout(() => {
+          document.body.removeChild(link);
+        }, 100);
+        return;
+      }
+
+      // Si c'est une URL HTTP/HTTPS (Firebase Storage, etc.)
+      if (imageUrl.startsWith("http://") || imageUrl.startsWith("https://")) {
+        try {
+          // Essayer d'abord sans paramètre de cache
+          let response = await fetch(imageUrl, {
+            method: "GET",
+            mode: "cors",
+            cache: "no-cache",
+          });
+
+          // Si ça échoue, essayer avec alt=media pour Firebase Storage
+          if (!response.ok && imageUrl.includes("storage.googleapis.com")) {
+            const urlWithAlt = imageUrl + (imageUrl.includes("?") ? "&" : "?") + "alt=media";
+            response = await fetch(urlWithAlt, {
+              method: "GET",
+              mode: "cors",
+              cache: "no-cache",
+            });
+          }
+
+          if (!response.ok) {
+            throw new Error(`HTTP Error: ${response.status} ${response.statusText}`);
+          }
+
+          const blob = await response.blob();
+          
+          if (!blob || blob.size === 0) {
+            throw new Error("Downloaded file is empty");
+          }
+
+          const url = window.URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.style.display = "none";
+          
+          // Déterminer l'extension depuis le Content-Type ou l'URL
+          let extension = "jpg";
+          const contentType = response.headers.get("content-type");
+          if (contentType) {
+            if (contentType.includes("png")) extension = "png";
+            else if (contentType.includes("gif")) extension = "gif";
+            else if (contentType.includes("webp")) extension = "webp";
+            else if (contentType.includes("jpeg") || contentType.includes("jpg")) extension = "jpg";
+          } else {
+            // Essayer d'extraire depuis l'URL
+            const urlMatch = imageUrl.match(/\.(jpg|jpeg|png|gif|webp|bmp|svg)/i);
+            if (urlMatch) {
+              extension = urlMatch[1].toLowerCase();
+              if (extension === "jpeg") extension = "jpg";
+            }
+          }
+          
+          const filename = typeof imageIdOrIndex === "string" 
+            ? `image-${imageIdOrIndex}.${extension}`
+            : `generated-image-${(imageIdOrIndex || 0) + 1}-${Date.now()}.${extension}`;
+          
+          a.download = filename;
+          document.body.appendChild(a);
+          a.click();
+          
+          // Nettoyer après un court délai
+          setTimeout(() => {
+            window.URL.revokeObjectURL(url);
+            if (document.body.contains(a)) {
+              document.body.removeChild(a);
+            }
+          }, 200);
+        } catch (fetchErr) {
+          console.error("Erreur fetch:", fetchErr);
+          // Fallback: essayer avec un lien direct
+          const link = document.createElement("a");
+          link.href = imageUrl;
+          link.target = "_blank";
+          link.rel = "noopener noreferrer";
+          const filename = typeof imageIdOrIndex === "string"
+            ? `image-${imageIdOrIndex}.jpg`
+            : `generated-image-${(imageIdOrIndex || 0) + 1}-${Date.now()}.jpg`;
+          link.download = filename;
+          document.body.appendChild(link);
+          link.click();
+          setTimeout(() => {
+            if (document.body.contains(link)) {
+              document.body.removeChild(link);
+            }
+          }, 100);
+        }
+      } else {
+        // Ancien comportement pour compatibilité
+        const link = document.createElement("a");
+        link.href = imageUrl;
+        link.download = typeof imageIdOrIndex === "string"
+          ? `image-${imageIdOrIndex}-${Date.now()}.png`
+          : `generated-image-${(imageIdOrIndex || 0) + 1}-${Date.now()}.png`;
+        document.body.appendChild(link);
+        link.click();
+        setTimeout(() => {
+          if (document.body.contains(link)) {
+            document.body.removeChild(link);
+          }
+        }, 100);
+      }
+    } catch (err) {
+      console.error("Error downloading:", err);
+      alert("Error downloading image: " + (err.message || "Unknown error. Try right-clicking on the image and 'Save image as...'"));
+    }
   };
 
   const handleDownloadAll = async () => {
@@ -305,6 +537,325 @@ function App() {
   const handleSelectImage = (index) => {
     setSelectedImageIndex(index);
   };
+
+  // ---------------- LAB MODE FUNCTIONS ----------------
+  const handleLabDataChange = (e) => {
+    setLabData({ ...labData, [e.target.name]: e.target.value });
+  };
+
+
+  const handleIngest = async () => {
+    if (!labData.prenom || !labData.nom) {
+      alert("Veuillez remplir au moins le prénom et le nom.");
+      return;
+    }
+
+    setLabLoading(true);
+    try {
+      const res = await fetch("http://localhost:5000/ingest", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: user?.email || "anonymous",
+          ...labData,
+        }),
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        // Après le fetching, recharger les images depuis Firestore pour avoir toutes les données complètes
+        try {
+          const imagesRes = await fetch(`http://localhost:5000/gallery/lab/${encodeURIComponent(user?.email || "anonymous")}`, {
+            method: "GET",
+            headers: { "Content-Type": "application/json" },
+          });
+          
+          const imagesData = await imagesRes.json();
+          if (imagesData.success && imagesData.images) {
+            const labImagesFromFirestore = imagesData.images.map(img => ({
+              id: img.id,
+              u: img.u || img.url, // Schéma conforme : champ u
+              url: img.url || img.u, // Alias pour compatibilité
+              t: img.t || img.tags || [], // Schéma conforme : champ t
+              tags: img.tags || img.t || [], // Alias pour compatibilité
+              p: img.p ?? img.context?.p ?? 1, // Schéma conforme : champ p
+              s: img.s || img.context?.s || "photo", // Schéma conforme : champ s
+              x: img.x || img.context?.x || [], // Schéma conforme : champ x
+              d: img.d || img.context?.d || "Image visuelle professionnelle.", // Schéma conforme : champ d
+              source: img.source || "unknown",
+              created_at: img.created_at,
+              context: img.context || {}, // Garder pour compatibilité
+            }));
+            
+            setLabImages(labImagesFromFirestore);
+            if (labImagesFromFirestore.length > 0) {
+              setLabCurrentImageIndex(0);
+            }
+            alert(`✅ ${labImagesFromFirestore.length} visuel(s) récupéré(s) et sauvegardé(s) dans Firestore !`);
+          } else {
+            // Si le rechargement échoue, utiliser les images de la réponse /ingest
+            setLabImages(data.images || []);
+            setLabCurrentImageIndex(0);
+            alert(`✅ ${data.images?.length || 0} visuel(s) récupéré(s) !`);
+          }
+        } catch (reloadErr) {
+          console.error("Error reloading images from Firestore:", reloadErr);
+          // En cas d'erreur, utiliser les images de la réponse /ingest
+          setLabImages(data.images || []);
+          setLabCurrentImageIndex(0);
+          alert(`✅ ${data.images?.length || 0} visuel(s) récupéré(s) !`);
+        }
+      } else {
+        alert("Erreur : " + (data.message || "Échec de la récupération des visuels"));
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Erreur serveur lors de la récupération des visuels.");
+    }
+    setLabLoading(false);
+  };
+
+
+  const handleAnalyzePost = async () => {
+    if (!labPostText.trim()) {
+      alert("Please enter the post text.");
+      return;
+    }
+
+    setLabLoading(true);
+    try {
+      // 1. Analyser le post
+      const res = await fetch("http://localhost:5000/post/analyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: user?.email || "anonymous",
+          postText: labPostText,
+        }),
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        setLabAnalysis(data.analysis);
+        alert("✅ Post analyzed successfully!");
+      } else {
+        alert("Error: " + (data.message || "Analysis failed"));
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Server error during analysis.");
+    }
+    setLabLoading(false);
+  };
+
+  const handleSelectImageLab = async () => {
+    if (!labPostText.trim()) {
+      alert("Veuillez d'abord saisir le texte du post.");
+      return;
+    }
+
+    setLabLoading(true);
+    try {
+      // Si la galerie locale est vide, récupérer les images depuis Firestore d'abord
+      if (labImages.length === 0) {
+        try {
+          const imagesRes = await fetch(`http://localhost:5000/gallery/lab/${encodeURIComponent(user?.email || "anonymous")}`, {
+            method: "GET",
+            headers: { "Content-Type": "application/json" },
+          });
+          
+          const imagesData = await imagesRes.json();
+          if (imagesData.success && imagesData.images) {
+            // Filtrer uniquement les images Lab (celles qui ont source ou labData)
+            const labImagesFromFirestore = imagesData.images
+              .filter(img => img.source || img.labData)
+              .map(img => ({
+                id: img.id,
+                u: img.u || img.url, // Schéma conforme : champ u
+                url: img.url || img.u, // Alias pour compatibilité
+                t: img.t || img.tags || [], // Schéma conforme : champ t
+                tags: img.tags || img.t || [], // Alias pour compatibilité
+                p: img.p ?? img.context?.p ?? 1, // Schéma conforme : champ p
+                s: img.s || img.context?.s || "photo", // Schéma conforme : champ s
+                x: img.x || img.context?.x || [], // Schéma conforme : champ x
+                d: img.d || img.context?.d || "Image visuelle professionnelle.", // Schéma conforme : champ d
+                source: img.source || "unknown",
+                created_at: img.created_at,
+                context: img.context || {}, // Garder pour compatibilité
+              }));
+            
+            if (labImagesFromFirestore.length > 0) {
+              setLabImages(labImagesFromFirestore);
+              setLabCurrentImageIndex(0);
+              console.log(`✅ Loaded ${labImagesFromFirestore.length} images from Firestore`);
+            }
+          }
+        } catch (imgErr) {
+          console.error("Error loading images from Firestore:", imgErr);
+          // Continue même si le chargement échoue, l'endpoint /select récupérera les images
+        }
+      }
+
+      // Sélectionner les 4 meilleures images (l'endpoint /select récupère automatiquement depuis Firestore)
+      const res = await fetch("http://localhost:5000/select", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: user?.email || "anonymous",
+          postText: labPostText,
+        }),
+      });
+
+      const data = await res.json();
+      
+      if (data.success) {
+        // Le backend retourne maintenant top4 avec score, reasons, matched_tags
+        const top4Images = data.top4 || [];
+        // Convertir le format top4 vers le format attendu par le frontend
+        const formattedImages = top4Images.map((img, index) => ({
+          id: img.id,
+          url: img.url,
+          source: img.source || "unknown",
+          tags: img.tags || img.matched_tags || [],
+          context: img.context || {},
+          score: img.score || 0,
+          reasons: img.reasons || [],
+          matched_tags: img.matched_tags || [],
+          p: img.p ?? img.p ?? 1, // Présence de personnes (0/1/2)
+          s: img.s || img.s || "photo", // Style (photo/illu/3d/icon)
+          rank: index + 1,
+        }));
+        setLabTop3Images(formattedImages);
+        setLabSelectedImage(null); // Réinitialiser la sélection
+        setLabTop3CurrentIndex(0); // Réinitialiser l'index du carrousel
+        
+        if (formattedImages.length === 0) {
+          alert("Aucune image recommandée trouvée.");
+        } else {
+          console.log(`✅ ${formattedImages.length} image(s) sélectionnée(s) avec scores:`, formattedImages.map(img => `${img.score?.toFixed(2) || 'N/A'}`).join(", "));
+        }
+      } else {
+        alert("Erreur : " + (data.message || "La sélection a échoué"));
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Erreur serveur lors de la sélection.");
+    }
+    setLabLoading(false);
+  };
+
+  const handleSelectOptimal = async () => {
+    if (!labPostText.trim()) {
+      alert("Veuillez d'abord saisir le texte du post.");
+      return;
+    }
+
+    setLabLoading(true);
+    try {
+      // Sélectionner les 4 meilleures images avec le nouveau prompt optimal
+      const res = await fetch("http://localhost:5000/select-optimal", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: user?.email || "anonymous",
+          postText: labPostText,
+        }),
+      });
+
+      if (!res.ok) {
+        const errorText = await res.text();
+        console.error("❌ Erreur HTTP:", res.status, errorText);
+        throw new Error(`Erreur HTTP ${res.status}: ${errorText}`);
+      }
+
+      const data = await res.json();
+      console.log("📊 Réponse du serveur:", data);
+      
+      if (data.success) {
+        // Le backend retourne top4 avec score, reasons, matched_tags
+        const top4Images = data.top4 || [];
+        // Convertir le format top4 vers le format attendu par le frontend
+        const formattedImages = top4Images.map((img, index) => ({
+          id: img.id,
+          url: img.url || img.u,
+          source: img.source || "unknown",
+          tags: img.tags || img.matched_tags || [],
+          context: img.context || {},
+          score: img.score || 0,
+          reasons: img.reasons || [],
+          matched_tags: img.matched_tags || [],
+          p: img.p ?? 1, // Présence de personnes (0/1/2)
+          s: img.s || "photo", // Style (photo/illu/3d/icon)
+          rank: index + 1,
+        }));
+        setLabTop3Images(formattedImages);
+        setLabSelectedImage(null); // Réinitialiser la sélection
+        setLabTop3CurrentIndex(0); // Réinitialiser l'index du carrousel
+        
+        if (formattedImages.length === 0) {
+          alert("Aucune image recommandée trouvée.");
+        } else {
+          console.log(`✅ ${formattedImages.length} image(s) sélectionnée(s) avec scores (sélection optimale):`, formattedImages.map(img => `${img.score?.toFixed(2) || 'N/A'}`).join(", "));
+        }
+      } else {
+        console.error("❌ Erreur dans la réponse:", data);
+        alert("Erreur : " + (data.message || "La sélection optimale a échoué"));
+      }
+    } catch (err) {
+      console.error("❌ Erreur complète:", err);
+      console.error("❌ Message d'erreur:", err.message);
+      console.error("❌ Stack trace:", err.stack);
+      alert("Erreur serveur lors de la sélection optimale: " + (err.message || "Erreur inconnue"));
+    }
+    setLabLoading(false);
+  };
+
+  const handleSaveSelectedImage = async (imageId) => {
+    if (!imageId) {
+      alert("No image selected.");
+      return;
+    }
+
+    if (!labTop3Images || labTop3Images.length === 0) {
+      alert("No images available to save.");
+      return;
+    }
+
+    try {
+      const res = await fetch("http://localhost:5000/select/save", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: user?.email || "anonymous",
+          imageId: imageId,
+          postText: labPostText || "",
+        }),
+      });
+
+      if (!res.ok) {
+        const errorText = await res.text();
+        throw new Error(`HTTP ${res.status}: ${errorText}`);
+      }
+
+      const data = await res.json();
+      if (data.success) {
+        // Trouver l'image dans top3Images et la définir comme sélectionnée
+        const selectedImg = labTop3Images.find(img => img.id === imageId);
+        if (selectedImg) {
+          setLabSelectedImage(selectedImg);
+          alert("✅ Image saved successfully to Firestore!");
+        } else {
+          alert("⚠️ Image saved but not found in the list.");
+        }
+      } else {
+        alert("Error: " + (data.message || "Save failed"));
+      }
+    } catch (err) {
+      console.error("Error during save:", err);
+      alert("Server error during save: " + (err.message || "Unknown error"));
+    }
+  };
+
 
   const handleDeleteAll = async () => {
     if (!user?.email) {
@@ -409,14 +960,12 @@ function App() {
           <div className="layout">
             {/* Left side */}
             <div className="upload-section">
-              <h3>📤 Upload your photos (max 10)</h3>
-
               <div className="scenario-toggle">
                 <button
                   className={flowType === "style" ? "active" : ""}
                   onClick={() => setFlowType("style")}
                 >
-                  Mode style prédéfini
+                  Predefined style mode
                 </button>
                 <button
                   className={flowType === "auto" ? "active" : ""}
@@ -424,7 +973,283 @@ function App() {
                 >
                   Mode auto-prompt (texte + selfies)
                 </button>
+                <button
+                  className={flowType === "lab" ? "active" : ""}
+                  onClick={() => setFlowType("lab")}
+                >
+                  Lab
+                </button>
               </div>
+
+              {flowType === "lab" ? (
+                <div className="lab-section">
+                  <h3>🔬 Lab Mode</h3>
+                  
+                  <div className="lab-form">
+                    <h4>📋 Information</h4>
+                    <input
+                      type="text"
+                      name="prenom"
+                      placeholder="First Name"
+                      value={labData.prenom}
+                      onChange={handleLabDataChange}
+                    />
+                    <input
+                      type="text"
+                      name="nom"
+                      placeholder="Last Name"
+                      value={labData.nom}
+                      onChange={handleLabDataChange}
+                    />
+                    <input
+                      type="text"
+                      name="entreprise"
+                      placeholder="Company"
+                      value={labData.entreprise}
+                      onChange={handleLabDataChange}
+                    />
+                    <input
+                      type="url"
+                      name="siteWeb"
+                      placeholder="Website"
+                      value={labData.siteWeb}
+                      onChange={handleLabDataChange}
+                    />
+                    <input
+                      type="url"
+                      name="linkedin"
+                      placeholder="LinkedIn Profile"
+                      value={labData.linkedin}
+                      onChange={handleLabDataChange}
+                    />
+                  </div>
+
+                  <div className="lab-actions">
+                    <button className="btn lab-btn" onClick={handleIngest} disabled={labLoading}>
+                      {labLoading ? "⏳ Fetching..." : "📥 Fetch Visuals"}
+                    </button>
+                  </div>
+
+                  <div className="lab-post-section">
+                    <h4>📝 Analyze a Post</h4>
+                    <textarea
+                      placeholder="Paste the LinkedIn post text here..."
+                      value={labPostText}
+                      onChange={(e) => setLabPostText(e.target.value)}
+                      className="lab-post-textarea"
+                    />
+                    
+                    
+                    
+                    <div className="lab-post-actions">
+                      <button className="btn lab-btn" onClick={handleAnalyzePost} disabled={labLoading || !labPostText.trim()}>
+                        {labLoading ? "⏳ Analyzing..." : "🔍 Analyze Post"}
+                      </button>
+                    
+                      <button 
+                        className="btn lab-btn" 
+                        onClick={handleSelectOptimal} 
+                        disabled={labLoading || !labPostText.trim()}
+                        title="Sélection optimale : favorise les images utiles (photo, portrait, people, workspace) et pénalise les inutiles (logo, icon, UI, dashboard abstrait)"
+                      >
+                        {labLoading ? "⏳ Selecting..." : "🎯 Select Optimal"}
+                      </button>
+                    </div>
+                  </div>
+
+                  {labAnalysis && (
+                    <div className="lab-analysis">
+                      <h4>📊 Post Analysis</h4>
+                      <div className="analysis-content">
+                        <p><strong>Themes:</strong> {labAnalysis.themes?.join(", ") || "N/A"}</p>
+                        <p><strong>Tone:</strong> {labAnalysis.tone || "N/A"}</p>
+                        <p><strong>Desired Tags:</strong> {labAnalysis.desiredTags?.join(", ") || "N/A"}</p>
+                      </div>
+                    </div>
+                  )}
+
+                  {labTop3Images && labTop3Images.length > 0 && (
+                    <div className="lab-top3-section">
+                      <h4>🏆Top {labTop3Images.length} Recommended Images ({labTop3Images.length})</h4>
+                      <div className="lab-gallery-carousel">
+                        <div className="lab-gallery-navigation">
+                          <button
+                            className="lab-nav-btn lab-nav-prev"
+                            onClick={() => setLabTop3CurrentIndex((prev) => (prev > 0 ? prev - 1 : labTop3Images.length - 1))}
+                            disabled={labTop3Images.length <= 1}
+                            title="Previous image"
+                          >
+                            ←
+                          </button>
+                          <div className="lab-gallery-counter">
+                            {labTop3CurrentIndex + 1} / {labTop3Images.length}
+                          </div>
+                          <button
+                            className="lab-nav-btn lab-nav-next"
+                            onClick={() => setLabTop3CurrentIndex((prev) => (prev < labTop3Images.length - 1 ? prev + 1 : 0))}
+                            disabled={labTop3Images.length <= 1}
+                            title="Next image"
+                          >
+                            →
+                          </button>
+                        </div>
+                        <div className="lab-gallery-item-container">
+                          <div key={labTop3Images[labTop3CurrentIndex].id || labTop3CurrentIndex} className="lab-gallery-item" style={{
+                            border: labSelectedImage?.id === labTop3Images[labTop3CurrentIndex].id ? "3px solid #4caf50" : "none"
+                          }}>
+                            <div style={{ position: "absolute", top: "10px", left: "10px", background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)", color: "white", fontWeight: "bold", fontSize: "14px", padding: "6px 10px", borderRadius: "50%", width: "32px", height: "32px", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 10, boxShadow: "0 2px 6px rgba(0,0,0,0.3)" }}>
+                              {labTop3Images[labTop3CurrentIndex].rank || labTop3CurrentIndex + 1}
+                            </div>
+                            <img
+                              src={labTop3Images[labTop3CurrentIndex].url}
+                              alt={`Recommended image ${labTop3CurrentIndex + 1}`}
+                              className="lab-gallery-img"
+                            />
+                            <div className="lab-image-info">
+                              <div style={{ display: "flex", gap: "8px", marginBottom: "10px" }}>
+                                <button
+                                  className="btn lab-btn"
+                                  onClick={() => handleSaveSelectedImage(labTop3Images[labTop3CurrentIndex].id)}
+                                  style={{ 
+                                    flex: 1,
+                                    background: labSelectedImage?.id === labTop3Images[labTop3CurrentIndex].id ? "#4caf50" : "#667eea"
+                                  }}
+                                >
+                                  {labSelectedImage?.id === labTop3Images[labTop3CurrentIndex].id ? "✅ Saved" : "💾 Save"}
+                                </button>
+                                <button
+                                  className="btn lab-btn"
+                                  onClick={() => {
+                                    const currentImage = labTop3Images[labTop3CurrentIndex];
+                                    if (currentImage && currentImage.url) {
+                                      handleDownloadImage(currentImage.url, currentImage.id || currentImage.rank || labTop3CurrentIndex);
+                                    } else {
+                                      alert("Image not available for download.");
+                                    }
+                                  }}
+                                  style={{ 
+                                    flex: 1,
+                                    background: "#2196F3"
+                                  }}
+                                >
+                                  ⬇️ Download
+                                </button>
+                              </div>
+                              
+                              {labTop3Images[labTop3CurrentIndex].reasons && labTop3Images[labTop3CurrentIndex].reasons.length > 0 && (
+                                <div style={{ marginBottom: "10px", padding: "8px", background: "#e3f2fd", borderRadius: "6px" }}>
+                                  <p style={{ fontSize: "11px", color: "#555", fontStyle: "italic", lineHeight: "1.4", margin: 0 }}>
+                                    💬 <strong>Raisons de sélection:</strong> {labTop3Images[labTop3CurrentIndex].reasons.join(", ")}
+                                  </p>
+                                </div>
+                              )}
+                              
+                              <p className="lab-image-source">
+                                <strong>Source:</strong> {labTop3Images[labTop3CurrentIndex].source || "N/A"}
+                              </p>
+                              
+                              {/* Métadonnées compactes : Score, p, s */}
+                              <div style={{ 
+                                margin: "8px 0", 
+                                padding: "8px", 
+                                background: "#f5f5f5", 
+                                borderRadius: "6px",
+                                fontSize: "11px",
+                                display: "flex",
+                                flexWrap: "wrap",
+                                gap: "8px",
+                                alignItems: "center"
+                              }}>
+                                <span style={{ fontWeight: "bold", color: "#667eea" }}>
+                                  📊 Score: <span style={{ color: "#333" }}>{labTop3Images[labTop3CurrentIndex].score?.toFixed(2) || "N/A"}</span>
+                                </span>
+                                <span style={{ fontWeight: "bold", color: "#2196F3" }}>
+                                  👥 p: <span style={{ color: "#333" }}>{labTop3Images[labTop3CurrentIndex].p ?? "N/A"}</span>
+                                </span>
+                                <span style={{ fontWeight: "bold", color: "#4caf50" }}>
+                                  🎨 s: <span style={{ color: "#333" }}>{labTop3Images[labTop3CurrentIndex].s || "N/A"}</span>
+                                </span>
+                              </div>
+                              
+                              {/* Tags correspondants */}
+                              {((labTop3Images[labTop3CurrentIndex].matched_tags && labTop3Images[labTop3CurrentIndex].matched_tags.length > 0) || 
+                                (labTop3Images[labTop3CurrentIndex].tags && labTop3Images[labTop3CurrentIndex].tags.length > 0)) && (
+                                <div className="lab-image-tags" style={{ marginTop: "8px" }}>
+                                  <strong style={{ fontSize: "11px", display: "block", marginBottom: "5px", color: "#555" }}>
+                                    🏷️ Tags correspondants ({labTop3Images[labTop3CurrentIndex].matched_tags?.length || labTop3Images[labTop3CurrentIndex].tags?.length || 0}):
+                                  </strong>
+                                  <div className="tags-list">
+                                    {(labTop3Images[labTop3CurrentIndex].matched_tags || labTop3Images[labTop3CurrentIndex].tags || []).map((tag, tagIndex) => (
+                                      <span key={tagIndex} className="tag-badge" title={tag} style={{ 
+                                        background: "#e3f2fd", 
+                                        color: "#1976d2",
+                                        padding: "3px 8px",
+                                        borderRadius: "12px",
+                                        fontSize: "10px",
+                                        fontWeight: "500"
+                                      }}>
+                                        {tag}
+                                      </span>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                              
+                              {labTop3Images[labTop3CurrentIndex].context && (
+                                <div className="lab-image-context">
+                                  <strong>Context:</strong>
+                                  {typeof labTop3Images[labTop3CurrentIndex].context === "object" ? (
+                                    <div style={{ marginTop: "5px", fontSize: "11px" }}>
+                                      {Object.entries(labTop3Images[labTop3CurrentIndex].context).map(([key, value]) => (
+                                        <div key={key} style={{ marginTop: "3px" }}>
+                                          <strong>{key}:</strong> {String(value)}
+                                        </div>
+                                      ))}
+                                    </div>
+                                  ) : (
+                                    <span> {labTop3Images[labTop3CurrentIndex].context}</span>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {labSelectedImage && (
+                    <div className="lab-selected" style={{ marginTop: "20px" }}>
+                      <h4>✅ Selected and Saved Image</h4>
+                      <img src={labSelectedImage.url} alt="Selected" className="lab-selected-img" />
+                      <div className="lab-selected-info" style={{ marginTop: "15px", padding: "10px", background: "#f9f9f9", borderRadius: "8px" }}>
+                        {labSelectedImage.score && (
+                          <p style={{ fontSize: "12px", marginBottom: "8px" }}>
+                            <strong>Relevance Score:</strong> {labSelectedImage.score}
+                          </p>
+                        )}
+                        {labSelectedImage.source && (
+                          <p style={{ fontSize: "12px", marginBottom: "8px" }}>
+                            <strong>Source:</strong> {labSelectedImage.source}
+                          </p>
+                        )}
+                        {labSelectedImage.tags && labSelectedImage.tags.length > 0 && (
+                          <div style={{ marginTop: "8px" }}>
+                            <strong style={{ fontSize: "12px", display: "block", marginBottom: "5px" }}>Tags:</strong>
+                            <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
+                              {labSelectedImage.tags.slice(0, 10).map((tag, tagIndex) => (
+                                <span key={tagIndex} className="tag-badge-small">{tag}</span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <>
+                  <h3>📤 {flowType === "auto" ? "Upload your selfies (max 2)" : "Upload your photos (max 10)"}</h3>
 
               <button className="btn" onClick={() => document.getElementById("galleryInput").click()}>
                 🖼️ Choose from gallery
@@ -450,7 +1275,7 @@ function App() {
                 onChange={handleUpload}
               />
 
-              <p>{photos.length} / 10 photos uploaded</p>
+              <p>{photos.length} / {flowType === "auto" ? "2 selfies" : "10 photos"} uploaded</p>
 
               <div className="preview-grid">
                 {photos.map((file, index) => (
@@ -468,48 +1293,62 @@ function App() {
               </div>
 
               <div className="style-select">
-                <h4>🎨 Choose a style</h4>
+                <h4>🎨 Choose a style <span style={{fontSize: '12px', color: '#666', fontWeight: 'normal'}}>(39 styles available)</span></h4>
                 <select
                   value={style}
                   onChange={(e) => setStyle(e.target.value)}
                   disabled={flowType === "auto"}
+                  style={{width: '100%', maxWidth: '500px', minHeight: '40px'}}
                 >
-                  <option value="professional_indoor">Professional Indoor</option>
-                  <option value="professional_outdoor">Professional Outdoor</option>
-                  <option value="corporate_studio">Corporate Studio</option>
-                  <option value="modern_workspace">Modern Workspace</option>
-                  <option value="personal_office">Personal Office</option>
-                  <option value="street">Street Casual</option>
-                  <option value="working_computer">Working on Computer</option>
-                  <option value="writing_notes">Writing Notes</option>
-                  <option value="presenting_screen">Presenting Screen</option>
-                  <option value="meeting">Meeting / Conference</option>
-                  <option value="walking_street">Walking in the Street</option>
-                  <option value="selfie_transport">Selfie in Transport</option>
-                  <option value="selfie_office">Selfie at Office</option>
-                  <option value="selfie_outdoor">Selfie Outdoor</option>
-                  <option value="selfie_pointing">Selfie Pointing Something</option>
-                  <option value="coffee_break">Coffee Break</option>
-                  <option value="eating">Eating</option>
-                  <option value="software_interface">Software Interface</option>
-                  <option value="app_showcase">App Showcase</option>
-                  <option value="digital_product_context">Digital Product Context</option>
-                  <option value="product_neutral">Product Neutral Background</option>
-                  <option value="product_real_context">Product Real Context</option>
-                  <option value="product_used">Product Used</option>
-                  <option value="mentor_leader">Mentor / Leader Portrait</option>
-                  <option value="creative_portrait">Creative Portrait</option>
-                  <option value="subtle_humor">Subtle Humor Scene</option>
+                  <option value="professional_indoor">Professional indoor portrait</option>
+                  <option value="professional_outdoor">Professional outdoor portrait</option>
+                  <option value="corporate_studio">Corporate studio portrait</option>
+                  <option value="modern_workspace">Portrait in modern workspace</option>
+                  <option value="personal_office">Portrait in personal office</option>
+                  <option value="street">Street portrait (urban)</option>
+                  <option value="working_computer">Person working on computer</option>
+                  <option value="writing_notes">Person writing or taking notes</option>
+                  <option value="presenting_screen">Person presenting on screen</option>
+                  <option value="meeting">Person in meeting</option>
+                  <option value="podcast">Person in podcast</option>
+                  <option value="conference">Person at conference</option>
+                  <option value="walking_street">Person walking on street</option>
+                  <option value="selfie_train">Selfie in train</option>
+                  <option value="selfie_car">Selfie in car</option>
+                  <option value="selfie_other_transport">Selfie in other transport</option>
+                  <option value="selfie_office">Selfie at desk</option>
+                  <option value="selfie_outdoor">Selfie outdoors (nature)</option>
+                  <option value="selfie_street">Selfie outdoors (street/urban)</option>
+                  <option value="selfie_gesture">Selfie with simple gesture</option>
+                  <option value="selfie_pointing">Selfie pointing at something</option>
+                  <option value="coffee_break">Person drinking coffee</option>
+                  <option value="drinking_other">Person drinking other beverage</option>
+                  <option value="eating_meal">Person eating simple meal</option>
+                  <option value="software_interface">Software interface on computer screen</option>
+                  <option value="software_interface_smartphone">Software interface on smartphone</option>
+                  <option value="app_screenshot">Application – stylized screenshot</option>
+                  <option value="app_immersive">Application – immersive representation</option>
+                  <option value="digital_product_computer">Digital product used on computer</option>
+                  <option value="digital_product_smartphone">Digital product used on smartphone</option>
+                  <option value="product_neutral">Physical product on neutral background</option>
+                  <option value="product_office">Physical product in office</option>
+                  <option value="product_indoor">Physical product indoors</option>
+                  <option value="product_outdoor">Physical product outdoors</option>
+                  <option value="product_person_blurred">Physical product in use (blurred person)</option>
+                  <option value="mentor_portrait">Mentor portrait</option>
+                  <option value="leader_portrait">Leader portrait</option>
+                  <option value="creative_portrait">Creative portrait</option>
+                  <option value="subtle_humor">Subtle humorous scene</option>
                 </select>
 
                 {flowType === "auto" && (
-                  <p className="disabled-hint">Le style est désactivé en mode auto-prompt.</p>
+                  <p className="disabled-hint">Style is disabled in auto-prompt mode.</p>
                 )}
               </div>
 
               {flowType === "auto" && (
                 <div className="post-text-block">
-                  <h4>📝 Texte du post</h4>
+                  <h4>📝 Post Text</h4>
 
                   <div className="post-input-toggle">
                     <button
@@ -519,7 +1358,7 @@ function App() {
                         setPostInputMode("select");
                       }}
                     >
-                      📋 Choisir un post prédéfini
+                      📋 Choose a predefined post
                     </button>
                     <button
                       type="button"
@@ -528,7 +1367,7 @@ function App() {
                         setPostInputMode("manual");
                       }}
                     >
-                      ✏️ Saisir manuellement
+                      ✏️ Enter manually
                     </button>
                   </div>
 
@@ -543,7 +1382,7 @@ function App() {
                       }}
                       className="post-select"
                     >
-                      <option value="">-- Sélectionnez un post de test --</option>
+                      <option value="">-- Select a test post --</option>
                       {predefinedPosts.map((post) => (
                         <option key={post.id} value={post.id}>
                           {post.title}
@@ -555,15 +1394,15 @@ function App() {
                   <textarea
                     placeholder={
                       postInputMode === "select"
-                        ? "Sélectionnez un post ci-dessus ou basculez en mode manuel pour écrire..."
-                        : "Décris le post LinkedIn / Instagram..."
+                        ? "Select a post above or switch to manual mode to write..."
+                        : "Describe the LinkedIn / Instagram post..."
                     }
                     value={postText}
                     onChange={(e) => setPostText(e.target.value)}
                     className={postInputMode === "select" && postText ? "selected-post-textarea" : ""}
                   ></textarea>
 
-                  <p className="hint">Ajoute 1 à 2 selfies pour un prompt personnalisé.</p>
+                  <p className="hint">Add 1 to 2 selfies for a personalized prompt.</p>
                 </div>
               )}
 
@@ -598,11 +1437,110 @@ function App() {
                   <p className="progress-text">{progress}%</p>
                 </div>
               )}
+                </>
+              )}
             </div>
 
             {/* Right side */}
             <div className="gallery">
-              <h3>🖼️ Generated Images ({selectedImageIndex !== null ? 1 : images.length})</h3>
+              {flowType === "lab" ? (
+                <>
+                  <h3>🖼️ Lab Gallery ({labImages.length} visual(s))</h3>
+                  {labImages.length > 0 ? (
+                    <div className="lab-gallery-carousel">
+                      <div className="lab-gallery-navigation">
+                        <button
+                          className="lab-nav-btn lab-nav-prev"
+                          onClick={() => setLabCurrentImageIndex((prev) => (prev > 0 ? prev - 1 : labImages.length - 1))}
+                          disabled={labImages.length <= 1}
+                          title="Previous image"
+                        >
+                          ←
+                        </button>
+                        <div className="lab-gallery-counter">
+                          {labCurrentImageIndex + 1} / {labImages.length}
+                        </div>
+                        <button
+                          className="lab-nav-btn lab-nav-next"
+                          onClick={() => setLabCurrentImageIndex((prev) => (prev < labImages.length - 1 ? prev + 1 : 0))}
+                          disabled={labImages.length <= 1}
+                          title="Next image"
+                        >
+                          →
+                        </button>
+                      </div>
+                      <div className="lab-gallery-item-container">
+                        <div key={labImages[labCurrentImageIndex].id || labCurrentImageIndex} className="lab-gallery-item">
+                          <img
+                            src={labImages[labCurrentImageIndex].url}
+                            alt={`Lab image ${labCurrentImageIndex + 1}`}
+                            className="lab-gallery-img"
+                          />
+                          <div className="lab-image-info">
+                            {/* Schéma JSON conforme */}
+                            <div style={{ marginTop: "10px", padding: "10px", background: "#f5f5f5", borderRadius: "8px", fontFamily: "monospace", fontSize: "12px" }}>
+                              <strong style={{ display: "block", marginBottom: "8px", color: "#333" }}>Schéma JSON:</strong>
+                              <pre style={{ margin: 0, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
+{JSON.stringify({
+  id: labImages[labCurrentImageIndex].id || labImages[labCurrentImageIndex].u?.split('/').pop() || "N/A",
+  u: labImages[labCurrentImageIndex].u || labImages[labCurrentImageIndex].url || "N/A",
+  t: labImages[labCurrentImageIndex].t || labImages[labCurrentImageIndex].tags || [],
+  p: labImages[labCurrentImageIndex].p ?? labImages[labCurrentImageIndex].context?.p ?? 1,
+  s: labImages[labCurrentImageIndex].s || labImages[labCurrentImageIndex].context?.s || "photo",
+  x: labImages[labCurrentImageIndex].x || labImages[labCurrentImageIndex].context?.x || [],
+  d: labImages[labCurrentImageIndex].d || labImages[labCurrentImageIndex].context?.d || "Image visuelle professionnelle."
+}, null, 2)}
+                              </pre>
+                            </div>
+                            
+                            {/* Métadonnées supplémentaires (optionnel) */}
+                            <div style={{ marginTop: "10px", fontSize: "11px", color: "#666" }}>
+                              {labImages[labCurrentImageIndex].source && (
+                                <p style={{ margin: "3px 0" }}>
+                                  <strong>Source:</strong> {labImages[labCurrentImageIndex].source}
+                                </p>
+                              )}
+                              {labImages[labCurrentImageIndex].created_at && (
+                                <p style={{ margin: "3px 0" }}>
+                                  <strong>Date:</strong> {(() => {
+                                    const date = labImages[labCurrentImageIndex].created_at;
+                                    let dateObj;
+                                    if (date?.seconds) {
+                                      dateObj = new Date(date.seconds * 1000);
+                                    } else if (date?.toDate) {
+                                      dateObj = date.toDate();
+                                    } else {
+                                      dateObj = new Date(date);
+                                    }
+                                    return dateObj.toLocaleDateString('fr-FR', { 
+                                      year: 'numeric', 
+                                      month: 'long', 
+                                      day: 'numeric',
+                                      hour: '2-digit',
+                                      minute: '2-digit'
+                                    });
+                                  })()}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="lab-empty-message">
+                      <p style={{ fontSize: "16px", marginBottom: "10px", fontWeight: "bold" }}>
+                        Aucun visuel récupéré
+                      </p>
+                      <p style={{ fontSize: "14px", color: "#666" }}>
+                        Veuillez d'abord lancer le fetching des visuels en cliquant sur le bouton "Fetch Visuals" ci-dessus.
+                      </p>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <>
+                  <h3>🖼️ Generated Images ({selectedImageIndex !== null ? 1 : images.length})</h3>
 
               <div className="gallery-grid">
                 {selectedImageIndex !== null ? (
@@ -625,9 +1563,9 @@ function App() {
                         e.stopPropagation();
                         handleDownloadImage(images[selectedImageIndex], selectedImageIndex);
                       }}
-                      title="Télécharger cette image"
+                      title="Download this image"
                     >
-                      ⬇️ Télécharger
+                      
                     </button>
                   </div>
                 ) : (
@@ -650,9 +1588,9 @@ function App() {
                           e.stopPropagation();
                           handleDownloadImage(img, index);
                         }}
-                        title="Télécharger cette image"
+                        title="Download this image"
                       >
-                        ⬇️ Télécharger
+                        ⬇️ Download
                       </button>
                     </div>
                   ))
@@ -678,7 +1616,7 @@ function App() {
                     onClick={handleSaveSelection}
                     disabled={selectedImageIndex === null || loading}
                   >
-                    💾 Sauvegarder l'image sélectionnée
+                    💾 Save selected image
                   </button>
 
                   <button
@@ -686,9 +1624,11 @@ function App() {
                     onClick={handleDownloadAll}
                     disabled={loading}
                   >
-                    ⬇️ Télécharger toutes les images
+                    ⬇️ Download all images
                   </button>
                 </div>
+              )}
+                </>
               )}
             </div>
           </div>
