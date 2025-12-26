@@ -3,6 +3,64 @@ import React, { useState, useEffect } from "react";
 import "./App.css";
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
 
+// Fonction utilitaire pour gérer les réponses JSON de manière sécurisée
+const safeJsonParse = async (response) => {
+  // Vérifier que la réponse est OK
+  if (!response.ok) {
+    const contentType = response.headers.get("content-type");
+    let errorMessage = `Erreur HTTP ${response.status}: ${response.statusText}`;
+    
+    // Essayer de récupérer le message d'erreur si c'est du JSON
+    if (contentType && contentType.includes("application/json")) {
+      try {
+        const errorData = await response.json();
+        errorMessage = errorData.message || errorData.error || errorMessage;
+      } catch (e) {
+        // Si le JSON est invalide, utiliser le texte brut
+        try {
+          const text = await response.text();
+          if (text) errorMessage = text;
+        } catch (e2) {
+          // Ignorer les erreurs de lecture du texte
+        }
+      }
+    } else {
+      // Si ce n'est pas du JSON, essayer de lire le texte
+      try {
+        const text = await response.text();
+        if (text) errorMessage = text;
+      } catch (e) {
+        // Ignorer les erreurs
+      }
+    }
+    
+    throw new Error(errorMessage);
+  }
+  
+  // Vérifier que le Content-Type est JSON
+  const contentType = response.headers.get("content-type");
+  if (!contentType || !contentType.includes("application/json")) {
+    // Si ce n'est pas du JSON, essayer de lire le texte pour voir ce qui a été renvoyé
+    const text = await response.text();
+    throw new Error(`Réponse non-JSON reçue. Type: ${contentType || 'inconnu'}. Contenu: ${text.substring(0, 100)}`);
+  }
+  
+  // Lire le texte de la réponse
+  const text = await response.text();
+  
+  // Vérifier que le texte n'est pas vide
+  if (!text || text.trim().length === 0) {
+    throw new Error("Réponse vide reçue du serveur");
+  }
+  
+  // Essayer de parser le JSON
+  try {
+    return JSON.parse(text);
+  } catch (e) {
+    throw new Error(`Erreur de parsing JSON: ${e.message}. Réponse reçue: ${text.substring(0, 200)}`);
+  }
+};
+
 function App() {
   const [mode, setMode] = useState("login");
   const [formData, setFormData] = useState({
@@ -97,32 +155,42 @@ function App() {
   const handleSignup = async (e) => {
     e.preventDefault();
 
-    const res = await fetch(API_URL/"signup", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(formData),
-    });
-    const data = await res.json();
-    alert(data.message);
+    try {
+      const res = await fetch(`${API_URL}/signup`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(formData),
+      });
+      const data = await safeJsonParse(res);
+      alert(data.message || "Inscription réussie");
+    } catch (err) {
+      console.error("Erreur lors de l'inscription:", err);
+      alert("Erreur lors de l'inscription: " + err.message);
+    }
   };
 
   // ---------------- LOGIN ----------------
   const handleLogin = async (e) => {
     e.preventDefault();
 
-    const res = await fetch(API_URL/"login", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email: formData.email, password: formData.password }),
-    });
+    try {
+      const res = await fetch(`${API_URL}/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: formData.email, password: formData.password }),
+      });
 
-    const data = await res.json();
+      const data = await safeJsonParse(res);
 
-    if (data.success) {
-      setUser({ email: formData.email, nom: data.nom, prenom: data.prenom });
-      setToken(data.token);
-    } else {
-      alert("Login failed");
+      if (data.success) {
+        setUser({ email: formData.email, nom: data.nom, prenom: data.prenom });
+        setToken(data.token);
+      } else {
+        alert("Échec de la connexion: " + (data.message || "Identifiants incorrects"));
+      }
+    } catch (err) {
+      console.error("Erreur lors de la connexion:", err);
+      alert("Erreur lors de la connexion: " + err.message);
     }
   };
 
@@ -202,7 +270,7 @@ function App() {
           return;
         }
         
-        const imagesData = await imagesRes.json();
+        const imagesData = await safeJsonParse(imagesRes);
         console.log(`📊 Réponse Firestore pour ${user.email}:`, {
           success: imagesData.success,
           count: imagesData.count || 0,
@@ -323,7 +391,7 @@ function App() {
         body: JSON.stringify(body),
       });
 
-      const data = await res.json();
+      const data = await safeJsonParse(res);
       clearInterval(progressInterval);
       setProgress(100);
 
@@ -374,7 +442,7 @@ function App() {
     const selectedUrl = images[selectedImageIndex];
 
     try {
-      const res = await fetch(API_URL/"selection", {
+      const res = await fetch(`${API_URL}/selection`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -385,11 +453,11 @@ function App() {
         }),
       });
 
-      const data = await res.json();
-      alert(data.message || "Selection saved.");
+      const data = await safeJsonParse(res);
+      alert(data.message || "Sélection sauvegardée.");
     } catch (err) {
-      console.error(err);
-      alert("Error saving selection.");
+      console.error("Erreur lors de la sauvegarde:", err);
+      alert("Erreur lors de la sauvegarde: " + err.message);
     }
   };
 
@@ -553,7 +621,7 @@ function App() {
 
     setLabLoading(true);
     try {
-      const res = await fetch("`${API_URL}/ingest", {
+      const res = await fetch(`${API_URL}/ingest`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -562,7 +630,7 @@ function App() {
         }),
       });
 
-      const data = await res.json();
+      const data = await safeJsonParse(res);
       if (data.success) {
         // Après le fetching, recharger les images depuis Firestore pour avoir toutes les données complètes
         try {
@@ -571,7 +639,11 @@ function App() {
             headers: { "Content-Type": "application/json" },
           });
           
-          const imagesData = await imagesRes.json();
+          if (!imagesRes.ok) {
+            throw new Error(`Erreur HTTP ${imagesRes.status}: ${imagesRes.statusText}`);
+          }
+          
+          const imagesData = await safeJsonParse(imagesRes);
           if (imagesData.success && imagesData.images) {
             const labImagesFromFirestore = imagesData.images.map(img => ({
               id: img.id,
@@ -626,7 +698,7 @@ function App() {
     setLabLoading(true);
     try {
       // 1. Analyser le post
-      const res = await fetch(API_URL/"post/analyze", {
+      const res = await fetch(`${API_URL}/post/analyze`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -635,7 +707,7 @@ function App() {
         }),
       });
 
-      const data = await res.json();
+      const data = await safeJsonParse(res);
       if (data.success) {
         setLabAnalysis(data.analysis);
         alert("✅ Post analyzed successfully!");
@@ -665,7 +737,11 @@ function App() {
             headers: { "Content-Type": "application/json" },
           });
           
-          const imagesData = await imagesRes.json();
+          if (!imagesRes.ok) {
+            throw new Error(`Erreur HTTP ${imagesRes.status}: ${imagesRes.statusText}`);
+          }
+          
+          const imagesData = await safeJsonParse(imagesRes);
           if (imagesData.success && imagesData.images) {
             // Filtrer uniquement les images Lab (celles qui ont source ou labData)
             const labImagesFromFirestore = imagesData.images
@@ -698,7 +774,7 @@ function App() {
       }
 
       // Sélectionner les 4 meilleures images (l'endpoint /select récupère automatiquement depuis Firestore)
-      const res = await fetch(API_URL/"select", {
+      const res = await fetch(`${API_URL}/select`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -707,7 +783,7 @@ function App() {
         }),
       });
 
-      const data = await res.json();
+      const data = await safeJsonParse(res);
       
       if (data.success) {
         // Le backend retourne maintenant top4 avec score, reasons, matched_tags
@@ -754,7 +830,7 @@ function App() {
     setLabLoading(true);
     try {
       // Sélectionner les 4 meilleures images avec le nouveau prompt optimal
-      const res = await fetch(API_URL/"select-optimal", {
+      const res = await fetch(`${API_URL}/select-optimal`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -763,13 +839,7 @@ function App() {
         }),
       });
 
-      if (!res.ok) {
-        const errorText = await res.text();
-        console.error("❌ Erreur HTTP:", res.status, errorText);
-        throw new Error(`Erreur HTTP ${res.status}: ${errorText}`);
-      }
-
-      const data = await res.json();
+      const data = await safeJsonParse(res);
       console.log("📊 Réponse du serveur:", data);
       
       if (data.success) {
@@ -823,7 +893,7 @@ function App() {
     }
 
     try {
-      const res = await fetch(API_URL/"select/save", {
+      const res = await fetch(`${API_URL}/select/save`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -833,12 +903,7 @@ function App() {
         }),
       });
 
-      if (!res.ok) {
-        const errorText = await res.text();
-        throw new Error(`HTTP ${res.status}: ${errorText}`);
-      }
-
-      const data = await res.json();
+      const data = await safeJsonParse(res);
       if (data.success) {
         // Trouver l'image dans top3Images et la définir comme sélectionnée
         const selectedImg = labTop3Images.find(img => img.id === imageId);
@@ -864,19 +929,24 @@ function App() {
       return;
     }
 
-    const res = await fetch(`${API_URL}/delete/${user.email}`, {
-      method: "DELETE",
-      headers: { Authorization: `Bearer ${token}` },
-    });
+    try {
+      const res = await fetch(`${API_URL}/delete/${user.email}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
 
-    const data = await res.json();
-    alert(data.message);
+      const data = await safeJsonParse(res);
+      alert(data.message || "Profil supprimé");
 
-    if (data.success) {
-      setPhotos([]);
-      setImages([]);
-      setUser(null);
-      setToken("");
+      if (data.success) {
+        setPhotos([]);
+        setImages([]);
+        setUser(null);
+        setToken("");
+      }
+    } catch (err) {
+      console.error("Erreur lors de la suppression:", err);
+      alert("Erreur lors de la suppression: " + err.message);
     }
   };
 
