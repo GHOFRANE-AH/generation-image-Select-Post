@@ -75,10 +75,14 @@ function App() {
   const [images, setImages] = useState([]);
   const [photos, setPhotos] = useState([]);
   const [style, setStyle] = useState("professional_indoor");
-  const [flowType, setFlowType] = useState("style"); // "style" | "auto" | "lab"
+  const [flowType, setFlowType] = useState("style"); // "style" | "auto" | "lab" | "lyter"
   const [postText, setPostText] = useState("");
   const [postInputMode, setPostInputMode] = useState("manual"); // "select" | "manual"
   const [generatedPrompt, setGeneratedPrompt] = useState("");
+  const [lyterPostText, setLyterPostText] = useState("");
+  const [lyterStyle, setLyterStyle] = useState("visual_metaphor");
+  const [lyterStyles, setLyterStyles] = useState([]);
+  const [lyterAnalysis, setLyterAnalysis] = useState(null);
   
   // Lab mode states
   const [labData, setLabData] = useState({
@@ -98,7 +102,7 @@ function App() {
   const [labTop3CurrentIndex, setLabTop3CurrentIndex] = useState(0);
   const [labStyle, setLabStyle] = useState("professional_indoor");
 
-  // Posts LinkedIn prédéfinis pour les tests - Thèmes très différents
+  // Posts LinkedIn prédéfinis pour le mode auto-prompt - Thèmes très différents
   const predefinedPosts = [
     {
       id: "corporate",
@@ -142,6 +146,59 @@ function App() {
     },
   ];
 
+  // Predefined posts for Lyter Mode - Conceptual illustrations
+  // Predefined posts for Lyter Mode - Conceptual illustrations
+const predefinedLyterPosts = [
+  {
+    id: "expertise_pedagogie",
+    title: "Expertise / Pedagogy Post",
+    text: "After mentoring dozens of beginners in data science, I’ve noticed a recurring pattern: many rush into machine learning without truly understanding their dataset.\n\nHere’s the advice I always give:\n\n📚 Start by exploring your data: structure, anomalies, patterns\n\n📊 Visualize before modeling — a chart often reveals what code hides\n\n🔍 Ask the right analytical questions before choosing an algorithm\n\n💡 Practice on real-world datasets, not only tutorials\n\nGreat data scientists aren’t defined by the number of algorithms they know, but by how deeply they understand their data.\n\nWhat was your biggest learning moment in data science?",
+  },
+
+  {
+    id: "methode_process",
+    title: "Method / Process Post",
+    text: "Here’s my simple workflow to create consistent LinkedIn content without stress:\n\n1️⃣ Choose 3 core themes that represent your expertise\n\n2️⃣ Brainstorm 10 post ideas for each theme\n\n3️⃣ Write everything in one focused session\n\n4️⃣ Schedule the posts for the next two weeks\n\n5️⃣ Spend 10 minutes daily replying to comments\n\nThis system keeps me consistent without relying on inspiration.\n\nDo you follow a structured process for your content?",
+  },
+
+  {
+    id: "comparaison_opinion",
+    title: "Comparison / Opinion Post",
+    text: "After years of switching between remote work and office life, here’s what I’ve learned:\n\n🏠 Remote work\n+ More flexibility\n+ More personal time\n+ Better focus\n- Less spontaneous interaction\n- Can feel isolating\n\n🏢 Office work\n+ Stronger team connection\n+ Faster collaboration\n+ Clearer boundaries\n- Commute fatigue\n- More interruptions\n\nFor me, hybrid remains the perfect balance.\n\nWhat work environment helps you perform best?",
+  },
+
+  {
+    id: "etude_analyse",
+    title: "Study / Analysis Post",
+    text: "I reviewed 1,000 LinkedIn posts to understand what truly drives engagement.\n\nHere are the most surprising insights:\n\n📈 Posts ending with a question get 3x more comments\n\n🖼️ Visual content boosts reach by 150%\n\n⏰ Best posting window: Tuesday–Thursday, 8–10 AM\n\n✍️ Posts under 1,500 characters perform better\n\n📚 Personal stories outperform generic advice\n\nThe conclusion is simple: authenticity wins.\n\nWhich insight resonates most with you?",
+  },
+
+  {
+    id: "annonce_produit",
+    title: "Product Announcement Post",
+    text: "🚀 Big news: Lyter is evolving!\n\nWe’re releasing a redesigned version built for speed, clarity, and creativity.\n\nHere’s what’s new:\n\n⚡ Smarter AI content suggestions\n\n📊 A refreshed analytics dashboard\n\n🎨 Advanced tone and style customization\n\n🔗 More integrations to simplify your workflow\n\nThis update marks a major step forward.\n\nWhich feature are you most excited to try?",
+  },
+
+  {
+    id: "citation_reflexion",
+    title: "Quote / Reflection Post",
+    text: "“Start where you are, with what you have.”\n\nThis sentence stayed with me all week.\n\nI’ve postponed several projects waiting for the “perfect moment”.\n\nBut the truth is: perfection never arrives.\n\nProgress begins with a single imperfect step.\n\nToday, I decided to stop waiting.\n\nWhat could you start today, even imperfectly?",
+  },
+
+  {
+    id: "storytelling_abstrait",
+    title: "Abstract Storytelling Post",
+    text: "This morning, walking under the rain, something clicked.\n\nEach drop felt like a reminder of ideas I had left aside.\n\nWe accumulate projects like clouds: quietly, slowly.\n\nThen suddenly, one moment unlocks everything.\n\nProgress rarely comes in a straight line — it comes in waves.\n\nWhat small idea is guiding you today?",
+  },
+
+  {
+    id: "technique_data",
+    title: "Technical / Data Post",
+    text: "Here’s a quick data insight from analyzing 50,000 LinkedIn posts:\n\n📈 Strong hooks increase engagement by 40%\n\n📸 Posts with visuals nearly double interactions\n\n⏱️ Morning posts get more comments\n\n🔢 List-style posts are read more fully\n\nThe data confirms what we feel intuitively: clarity wins.\n\nWhat’s your best tip for boosting engagement?",
+  },
+];
+
+  
   const [numberOfImages, setNumberOfImages] = useState(3);
   const [loading, setLoading] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -231,6 +288,34 @@ function App() {
       }
     }
   }, [flowType, photos.length]);
+
+  // Charger les styles Lyter disponibles
+  React.useEffect(() => {
+    const loadLyterStyles = async () => {
+      try {
+        const res = await fetch(`${API_URL}/lyter/styles`, {
+          method: "GET",
+          headers: { "Content-Type": "application/json" },
+        });
+        const data = await safeJsonParse(res);
+        if (data.success && data.styles) {
+          setLyterStyles(data.styles);
+          if (data.styles.length > 0 && !lyterStyle) {
+            setLyterStyle(data.styles[0].id);
+          }
+        }
+      } catch (err) {
+        console.error("Error loading Lyter styles:", err);
+        // Styles par défaut en cas d'erreur
+        setLyterStyles([
+          { id: "visual_metaphor", name: "Visual Metaphor", description: "Abstract illustration of an idea" },
+          { id: "cheat_sheet", name: "Cheat Sheet Infographic", description: "Structured, readable, very pedagogical visuals" },
+          { id: "process_steps", name: "Process/Steps Infographic", description: "Diagrams explaining a process or workflow" },
+        ]);
+      }
+    };
+    loadLyterStyles();
+  }, []);
 
   // Charger les images Lab quand le mode Lab est activé et que l'utilisateur est connecté
   React.useEffect(() => {
@@ -829,7 +914,7 @@ function App() {
 
     setLabLoading(true);
     try {
-      // Sélectionner les 4 meilleures images avec le nouveau prompt optimal
+      // Sélectionner les 4 meilleures images avec le nouveau s optimal
       const res = await fetch(`${API_URL}/select-optimal`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -956,6 +1041,73 @@ function App() {
     setToken("");
   };
 
+  // ---------------- LYTER MODE FUNCTIONS ---------------- 
+  const handleGenerateLyter = async () => {
+    if (!lyterPostText.trim()) {
+      alert("Please enter the LinkedIn post text.");
+      return;
+    }
+
+    setLoading(true);
+    setImages([]);
+    setGeneratedPrompt("");
+    setSelectedImageIndex(null);
+    setProgress(0);
+
+    const progressInterval = setInterval(() => {
+      setProgress((prev) => (prev >= 90 ? 90 : prev + 2));
+    }, 100);
+
+    try {
+      const res = await fetch(`${API_URL}/generate-lyter`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: user?.email || "anonymous",
+          postText: lyterPostText,
+          numberOfImages: 1, // Default 1 illustration for Lyter
+          illustrationStyle: lyterStyle,
+        }),
+      });
+
+      const data = await safeJsonParse(res);
+      clearInterval(progressInterval);
+      setProgress(100);
+
+      if (data.success) {
+        if (data.prompt) {
+          setGeneratedPrompt(data.prompt);
+        } else if (data.optimizedPrompt) {
+          setGeneratedPrompt(data.optimizedPrompt);
+        }
+
+        // Sauvegarder l'analyse détectée (toujours afficher même si backend ne retourne pas)
+        setLyterAnalysis({
+          postType: data.detectedPostType || "General",
+          style: data.styleName || lyterStyles.find(s => s.id === lyterStyle)?.name || "Visual Metaphor"
+        });
+
+        if (data.imageUrls && Array.isArray(data.imageUrls)) {
+          const unique = Array.from(new Set(data.imageUrls));
+          setImages(unique);
+        } else if (data.imageUrl || data.url) {
+          setImages([data.imageUrl || data.url]);
+        } else {
+          alert("Error: No illustration received");
+        }
+      } else {
+        alert("Error during generation: " + (data.message || "Unknown error"));
+      }
+    } catch (err) {
+      console.error(err);
+      clearInterval(progressInterval);
+      alert("Server error during illustration generation");
+    }
+
+    setLoading(false);
+    setTimeout(() => setProgress(0), 500);
+  };
+
   // ---------------- RENDER ----------------
   return (
     <div className="container">
@@ -1050,9 +1202,104 @@ function App() {
                 >
                   Lab
                 </button>
+                <button
+                  className={flowType === "lyter" ? "active" : ""}
+                  onClick={() => setFlowType("lyter")}
+                >
+                  Lyter Mode (Conceptual Illustration)
+                </button>
               </div>
 
-              {flowType === "lab" ? (
+              {flowType === "lyter" ? (
+                <div className="lyter-section">
+                  <h3>🎨 Lyter - Conceptual Illustration</h3>
+                  <p style={{ fontSize: "14px", color: "#666", marginBottom: "20px" }}>
+                    Automatically generate a conceptual illustration from LinkedIn post text.
+                    <br />
+                    <strong>No human faces</strong> - The illustration explains/illustrates the post's idea, not the person.
+                  </p>
+
+                  
+                  
+
+                  <div className="post-text-block">
+                    <h4>📝 LinkedIn Post Text</h4>
+                    <div className="post-input-toggle">
+                      <button
+                        type="button"
+                        className={postInputMode === "select" ? "active" : ""}
+                        onClick={() => {
+                          setPostInputMode("select");
+                        }}
+                      >
+                        📋 Choose a predefined post
+                      </button>
+                      <button
+                        type="button"
+                        className={postInputMode === "manual" ? "active" : ""}
+                        onClick={() => {
+                          setPostInputMode("manual");
+                        }}
+                      >
+                        ✏️ Enter manually
+                      </button>
+                    </div>
+
+                    {postInputMode === "select" && (
+                      <select
+                        value=""
+                        onChange={(e) => {
+                          const selectedPost = predefinedLyterPosts.find((p) => p.id === e.target.value);
+                          if (selectedPost) {
+                            setLyterPostText(selectedPost.text);
+                          }
+                        }}
+                        className="post-select"
+                      >
+                        <option value="">-- Select a test post --</option>
+                        {predefinedLyterPosts.map((post) => (
+                          <option key={post.id} value={post.id}>
+                            {post.title}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+
+                    <textarea
+                      placeholder={
+                        postInputMode === "select"
+                          ? "Select a post above or switch to manual mode to write..."
+                          : "Paste your LinkedIn post text here..."
+                      }
+                      value={lyterPostText}
+                      onChange={(e) => setLyterPostText(e.target.value)}
+                      className={postInputMode === "select" && lyterPostText ? "selected-post-textarea" : ""}
+                      rows={8}
+                    ></textarea>
+
+                    <p className="hint">
+                      💡 The generated illustration will be conceptual and without human faces, to illustrate your post's idea.
+                    </p>
+                  </div>
+
+                  <button 
+                    className="btn generate" 
+                    onClick={handleGenerateLyter} 
+                    disabled={loading || !lyterPostText.trim()}
+                  >
+                    {loading ? "Generating..." : "🎨 Generate illustration"}
+                  </button>
+
+                  {loading && (
+                    <div className="progress-container">
+                      <div className="progress-bar">
+                        <div className="progress-fill" style={{ width: `${progress}%` }}></div>
+                      </div>
+                      <p className="progress-text">{progress}%</p>
+                    </div>
+                  )}
+                </div>
+              ) : flowType === "lab" ? (
                 <div className="lab-section">
                   <h3>🔬 Lab Mode</h3>
                   
@@ -1514,7 +1761,119 @@ function App() {
 
             {/* Right side */}
             <div className="gallery">
-              {flowType === "lab" ? (
+              {flowType === "lyter" ? (
+                <>
+                  <h3>🎨 Generated Illustrations ({selectedImageIndex !== null ? 1 : images.length})</h3>
+                  
+                  {/* Images générées */}
+                  <div className="gallery-grid">
+                    {selectedImageIndex !== null ? (
+                      <div className="image-wrapper">
+                        <img
+                          key={selectedImageIndex}
+                          src={images[selectedImageIndex]}
+                          alt={`Selected illustration ${selectedImageIndex + 1}`}
+                          className="gallery-img selected"
+                          onClick={() => setSelectedImageIndex(null)}
+                          title="Click to show all illustrations"
+                          onError={(e) => {
+                            e.target.style.display = "none";
+                            console.error("Image failed to load:", images[selectedImageIndex]?.substring(0, 50));
+                          }}
+                        />
+                        <button
+                          className="download-btn"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDownloadImage(images[selectedImageIndex], selectedImageIndex);
+                          }}
+                          title="Download this illustration"
+                        >
+                          ⬇️ Download
+                        </button>
+                      </div>
+                    ) : (
+                      images.map((img, index) => (
+                        <div key={index} className="image-wrapper">
+                          <img
+                            src={img}
+                            alt={`Illustration ${index + 1}`}
+                            className="gallery-img clickable"
+                            onClick={() => handleSelectImage(index)}
+                            title="Click to select this illustration"
+                            onError={(e) => {
+                              e.target.style.display = "none";
+                              console.error(`Illustration ${index + 1} failed to load:`, img?.substring(0, 50));
+                            }}
+                          />
+                          <button
+                            className="download-btn"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDownloadImage(img, index);
+                            }}
+                            title="Download this illustration"
+                          >
+                            ⬇️ Download
+                          </button>
+                        </div>
+                      ))
+                    )}
+
+                    {images.length === 0 && !loading && (
+                      <p>No illustrations generated yet. Enter the post text and click "Generate illustration"!</p>
+                    )}
+                  </div>
+
+                  {selectedImageIndex !== null && images.length > 1 && (
+                    <p className="selection-hint">✓ Illustration selected! Click on it to show all illustrations.</p>
+                  )}
+
+                  {/* Affichage de l'analyse après les images */}
+                  {lyterAnalysis && images.length > 0 && (
+                    <div className="lyter-analysis-panel">
+                      <h4>📊 Analysis Detected</h4>
+                      <div className="lyter-analysis-item">
+                        <strong>Type:</strong>
+                        <div className="lyter-analysis-value">
+                          {lyterAnalysis.postType}
+                        </div>
+                      </div>
+                      <div className="lyter-analysis-item">
+                        <strong>Style:</strong>
+                        <div className="lyter-analysis-value">
+                          {lyterAnalysis.style}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Boutons d'action après l'analyse */}
+                  {images.length > 0 && (
+                    <div className="lyter-gallery-actions">
+                      <button className="btn generate" onClick={handleGenerateLyter} disabled={loading}>
+                        🔄 Regenerate
+                      </button>
+
+                      <button
+                        className="btn save-btn"
+                        onClick={handleSaveSelection}
+                        disabled={selectedImageIndex === null || loading}
+                      >
+                        💾 Save selected illustration
+                      </button>
+
+                      <button
+                        className="btn download-all-btn"
+                        onClick={handleDownloadAll}
+                        disabled={loading}
+                      >
+                        ⬇️ Download all illustrations
+                      </button>
+                    </div>
+                  )}
+                </>
+              ) : flowType === "lab" ? (
                 <>
                   <h3>🖼️ Lab Gallery ({labImages.length} visual(s))</h3>
                   {labImages.length > 0 ? (
