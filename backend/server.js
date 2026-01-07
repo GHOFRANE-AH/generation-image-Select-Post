@@ -6430,14 +6430,35 @@ app.post("/select-optimal", async (req, res) => {
       }
     });
 
-    if (imagesCompact.length === 0) {
+    // Filtrer les images : exclure celles avec source "unknown" ou autre que "linkedin"/"website"
+    // ET exclure celles avec style "illu" (ne garder que "photo")
+    const validSources = ["linkedin", "website"];
+    const initialCount = imagesCompact.length;
+    const filteredImages = imagesCompact.filter(img => {
+      const source = (img.source || "unknown").toLowerCase();
+      const style = (img.s || "photo").toLowerCase();
+      
+      // Vérifier la source valide ET le style photo uniquement
+      return validSources.includes(source) && style === "photo";
+    });
+
+    if (filteredImages.length === 0) {
       return res.status(404).json({ 
         success: false, 
-        message: "Aucune image trouvée dans Firestore. Veuillez d'abord récupérer des visuels." 
+        message: "Aucune image valide trouvée (seules les images avec source 'linkedin' ou 'website' ET style 'photo' sont acceptées)." 
       });
     }
 
-    console.log(`📊 ${imagesCompact.length} images candidates récupérées pour sélection optimale`);
+    const excludedCount = initialCount - filteredImages.length;
+    if (excludedCount > 0) {
+      console.log(`⚠️ ${excludedCount} image(s) exclue(s) (source invalide ou style "illu" - seules les photos avec source "linkedin"/"website" sont acceptées)`);
+    }
+
+    // Remplacer imagesCompact par les images filtrées
+    imagesCompact.length = 0;
+    imagesCompact.push(...filteredImages);
+
+    console.log(`📊 ${imagesCompact.length} images candidates valides récupérées pour sélection optimale`);
     console.log(`📝 Texte du post à analyser (${finalPostText.length} caractères): "${finalPostText.substring(0, 150)}${finalPostText.length > 150 ? '...' : ''}"`);
 
     // 2. Appeler le LLM avec le NOUVEAU PROMPT OPTIMISÉ (focus sur description)
@@ -6882,9 +6903,15 @@ app.get("/images/search", async (req, res) => {
     // Construire la requête Firestore
     let query = db.collection("images").where("email", "==", userEmail);
     
-    // Filtrer par source si spécifié
-    if (searchSource) {
-      query = query.where("source", "==", searchSource);
+    // Toujours filtrer par source valide (linkedin ou website) - exclure "unknown" et autres
+    const validSources = ["linkedin", "website"];
+    
+    // Filtrer par source spécifique si demandé, sinon filtrer par sources valides
+    if (searchSource && validSources.includes(searchSource.toLowerCase())) {
+      query = query.where("source", "==", searchSource.toLowerCase());
+    } else {
+      // Toujours exclure "unknown" et autres sources invalides
+      query = query.where("source", "in", validSources);
     }
     
     // Filtrer par score de pertinence minimum si spécifié
@@ -6899,8 +6926,14 @@ app.get("/images/search", async (req, res) => {
       const data = doc.data();
       let matches = true;
       
+      // Vérification supplémentaire de la source (sécurité)
+      const imageSource = (data.source || "unknown").toLowerCase();
+      if (!validSources.includes(imageSource)) {
+        matches = false; // Exclure les images avec source invalide
+      }
+      
       // Filtrer par tags si spécifiés
-      if (searchTags.length > 0) {
+      if (searchTags.length > 0 && matches) {
         const imageTags = (data.tags || []).map(t => t.toLowerCase());
         const hasMatchingTag = searchTags.some(searchTag => 
           imageTags.some(imgTag => imgTag.includes(searchTag.toLowerCase()) || searchTag.toLowerCase().includes(imgTag))
