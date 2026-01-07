@@ -242,7 +242,7 @@ Lyter uses a compact JSON schema for image metadata:
 
 ### Frontend Deployment (Vercel/Netlify)
 
-1. Build the production bundle:
+1. Build the production bundle
 ```bash
 npm run build
 ```
