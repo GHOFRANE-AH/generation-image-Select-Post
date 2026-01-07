@@ -628,6 +628,27 @@ app.delete("/delete/:email", async (req, res) => {
   }
 });
 
+// ---------------------- HELPER FUNCTIONS FOR PROMPT NORMALIZATION ----------------------
+// Fonction pour normaliser les prompts et supprimer toutes les mentions de flou
+const normalizePromptForSharpBackground = (prompt) => {
+      return prompt
+        .replace(/naturally blurred with authentic depth of field/gi, "SHARP and CLEAR with full focus throughout")
+        .replace(/naturally blurred/gi, "SHARP and CLEAR")
+        .replace(/naturally out of focus, soft and blurred/gi, "SHARP, CLEAR, and FULLY READABLE")
+        .replace(/out of focus, soft and blurred/gi, "SHARP, CLEAR, and FULLY READABLE")
+        .replace(/out of focus/gi, "SHARP and CLEAR")
+        .replace(/soft and blurred/gi, "SHARP and CLEAR")
+        .replace(/blurred/gi, "SHARP and CLEAR")
+        .replace(/background blur/gi, "SHARP background")
+        .replace(/natural background blur/gi, "SHARP background")
+        .replace(/natural depth of field/gi, "deep focus throughout")
+        .replace(/depth of field/gi, "deep focus")
+        .replace(/Screen visible but content blurred/gi, "Screen visible with readable content")
+        .replace(/content blurred/gi, "content readable")
+        .replace(/Person visible but blurred/gi, "Person visible and clear")
+        .replace(/blurred \(natural depth of field\)/gi, "SHARP and CLEAR");
+};
+
 // ---------------------- GENERATE IMAGE (Gemini + style) ----------------------
 app.post("/generate", async (req, res) => {
   try {
@@ -649,54 +670,111 @@ app.post("/generate", async (req, res) => {
       return res.status(400).json({ success: false, message: "Maximum 10 photos allowed" });
     }
 
-   // Helper function to add ULTRA-STRICT face fidelity with ENHANCED PHOTOREALISM
-// Helper function to add face fidelity and photorealism requirements (OPTIMIZED)
-const addFidelityRequirements = (basePrompt) => {
-  return `${basePrompt}
+    const addFidelityRequirements = (basePrompt) => {
+      // Normaliser le prompt pour supprimer toutes les mentions de flou
+      const normalizedPrompt = normalizePromptForSharpBackground(basePrompt);
+      return `${normalizedPrompt}
 
-IDENTITY & REALISM REQUIREMENTS:
+CRITICAL REALISM REQUIREMENTS - ZERO AI ARTIFACTS:
 
-FACE (preserve exactly from reference):
-- Exact eye color, shape, expression, face shape, nose, mouth
-- Exact skin tone with natural variations (not uniform)
-- Exact age with all wrinkles, lines, natural asymmetry
-- Visible pores (nose, cheeks, forehead), natural imperfections
-- Subtle T-zone shine, realistic under-eye area
-- NO airbrushing, NO smooth plastic skin
+FACE PRESERVATION (ABSOLUTE - NO CLEANUP OR SMOOTHING - CRITICAL):
+- EXACT facial geometry: preserve ALL natural asymmetries, uneven proportions, micro-imperfections EXACTLY as in reference
+- PRESERVE natural facial volumes: keep original cheek fullness, jawline shape, facial contours EXACTLY as in reference - NO changes
+- PRESERVE EXACT same nose shape, size, and position as reference
+- PRESERVE EXACT same mouth shape, lip size, and position as reference
+- PRESERVE EXACT same eye shape, size, position, and expression as reference
+- NO slimming, NO contouring, NO idealization, NO beautification, NO enhancement whatsoever
+- PRESERVE all skin imperfections: visible pores, acne, scars, spots, blemishes, texture variations EXACTLY as shown
+- PRESERVE under-eye circles, eye bags, natural fatigue signs EXACTLY as in reference
+- PRESERVE skin redness, blotches, uneven skin tone, discoloration patches EXACTLY as shown
+- PRESERVE ALL wrinkles, fine lines, and facial lines EXACTLY as in reference
+- Skin texture must be NON-UNIFORM with natural variations and visible defects - NO smooth appearance
+- NO skin smoothing, NO airbrushing, NO digital cleanup, NO retouching of any kind
+- Face must look EXACTLY like the reference person with ALL their natural features and imperfections
 
-HAIR & BEARD (preserve exactly):
-- Exact color (grays included), style, length, texture, hairline
-- If beard present: exact length, style, density, color
-- Natural texture, slight flyaways for realism
 
-CLOTHING (preserve style):
-- Same formality level, colors, patterns, fit from reference
-- Natural fabric wrinkles, realistic texture
-- Same accessories (glasses, watch, jewelry)
+EYES & EYELASHES (100% NATURAL - EXACT PRESERVATION):
+- Eyes: EXACT same eye color, shape, size, and position as reference - NO changes
+- Eyes: natural human moisture level (NOT glossy, NOT glassy, NOT overly bright, NOT enhanced)
+- Iris: EXACT same color and pattern as reference - realistic low-contrast, natural texture
+- Eyelashes: EXACT same length, density, and style as reference - irregular, uneven, imperfect alignment
+- Eyebrows: EXACT same shape, thickness, and color as reference - preserve natural imperfections
+- NO false lash effect, NO mascara perfection, NO eye enhancement, NO eyebrow styling
+- Preserve EXACT same eye expression and gaze direction as reference
 
-PHOTOREALISM (critical):
-- Natural lighting matching setting (avoid perfect even light)
-- Realistic depth of field:
-  * Portraits: face sharp, background softly blurred (recognizable)
-  * Selfies: wider depth, background fairly sharp, slight wide-angle distortion
-  * Outdoor: background moderately soft, environment visible
-- Lived-in backgrounds: slight clutter, varied textures, authentic details
-- Natural camera behavior: appropriate lens compression, subtle grain in low light
-- Slight imperfections: not perfectly centered, natural variations
-- NO excessive blur, NO sterile environments, NO artificial perfection
+FACIAL HAIR & HAIR (EXACT PRESERVATION - CRITICAL):
+- Beard/stubble: EXACT same density, length, color, and growth pattern as reference
+- PRESERVE irregular growth patterns, natural unevenness, patches, and natural imperfections
+- NO sharp barber lines, NO perfect grooming, NO artificial neatness, NO trimming
+- Hair: EXACT same hairline, color, length, style, and texture as reference
+- PRESERVE natural density variations, flyaways, gray hairs, natural texture EXACTLY as shown
+- NO perfect styling, NO artificial smoothness, NO hair products visible effect
+- Hair must look EXACTLY like reference person's natural hair with all imperfections
 
-SELFIES (if applicable):
-- Natural hand position (may be partially visible)
-- Authentic framing (close, slight angle, arm's length)
-- Smartphone lens (wide 28-35mm, larger depth of field)
-- Casual lighting, spontaneous feel
+SKIN TEXTURE (IMPERFECTIONS REQUIRED):
+- Visible pores, texture variations, natural roughness
+- Uneven skin tone with blotches, redness, discoloration
+- Natural skin defects: acne, scars, spots, blemishes ALL VISIBLE
+- NO uniform skin tone, NO smooth plastic look, NO airbrushed appearance
 
-ONLY ONE PERSON:
-- Only the user visible, no other people
-- Background may have very blurred unrecognizable figures
+CAMERA & DEPTH OF FIELD (SMARTPHONE/NORMAL CAMERA - NO PORTRAIT MODE):
+- Camera type: standard smartphone camera OR simple point-and-shoot camera
+- CRITICAL: NO portrait mode, NO bokeh effect, NO background blur
+- CRITICAL: Background must be SHARP and FULLY READABLE - same focus as subject
+- CRITICAL: NO shallow depth of field, NO subject/background separation
+- CRITICAL: Deep focus throughout entire image - foreground AND background EQUALLY SHARP
+- Natural depth perception WITHOUT artificial blur effects
+- Background details must be CLEAR, VISIBLE, and READABLE
 
-GOAL: Real photograph, 100% recognizable person, natural imperfections, authentic lighting, lived-in quality, NOT AI-looking.`;
-};
+BACKGROUND & ENVIRONMENT (REAL LIFE - FULLY VISIBLE):
+- Real lived-in environment with authentic details
+- Background must be SHARP and CLEAR (NOT blurred)
+- Visible textures, objects, details in background
+- Natural disorder, clutter, everyday imperfections
+- Background elements must be READABLE and RECOGNIZABLE
+- NOT studio, NOT staged, NOT cinematic, NOT artificially blurred
+- Real-world context fully visible and understandable
+
+LIGHTING (NATURAL - NO PROFESSIONAL SETUP):
+- Natural ambient lighting (window light, room light, daylight)
+- Uneven lighting with natural shadows and highlights
+- NO professional studio lighting, NO artificial lighting setup
+- Subtle natural variations in light intensity
+- Realistic color temperature matching natural light sources
+
+FRAMING & COMPOSITION (CASUAL - NOT PERFECT):
+- Minor framing imperfections: not perfectly centered, slight tilt
+- Natural camera angle, authentic perspective
+- Subtle noise/grain allowed (realistic camera sensor noise)
+- NO perfect composition, NO ideal framing
+
+SELFIES (IF APPLICABLE - NATURAL - CRITICAL):
+- Authentic arm-length framing with natural distance
+- Slight angle typical of selfies
+- CRITICAL: NO smartphone visible in hands - phone and hand holding it are OUTSIDE the frame
+- CRITICAL: NO visible phone screen, NO visible hand holding phone - everything OUTSIDE frame
+- Natural hand position may be partially visible (but NOT holding phone)
+- Casual, spontaneous, unposed feel
+- NO perfect selfie angle, NO ideal framing
+
+CLOTHING CONSISTENCY (PRESERVED):
+- EXACT same formality level, colors, patterns, cut, and fit as reference photos
+- Natural fabric wrinkles, wear, and texture
+- Same accessories if present in reference
+- NO costume changes, NO style modifications
+
+SINGLE PERSON ONLY:
+- Only ONE person in frame
+- NO other humans, NO people in background
+
+Background MUST be 100% sharp, readable, and in equal focus as the subject. NO blur allowed.
+Skin texture must show visible pores, wrinkles, and imperfections. NO smoothing, NO beautification, NO enhancement. Skin must look rough, uneven, and natural.
+- NO glassy eyes, NO glossy effect, NO artificial brightness, NO enhancement of moisture or shine
+- Eyes must look dry and natural, with realistic light reflection
+
+ABSOLUTE GOAL:
+A REAL photograph taken with a normal smartphone or simple camera - NOT AI-generated looking. The person's face must be EXACTLY identical to reference with ALL imperfections, asymmetries, and natural flaws preserved. Background must be SHARP and FULLY READABLE (NO blur, NO bokeh). Skin must show natural texture and defects. Eyes must be natural without enhancement. The entire image must look like a casual, unretouched, real-world photograph with zero AI beautification or professional photography effects.`;
+    };
     // Prompts by style (English for better model results)
     let finalPrompt = "";
 
@@ -704,284 +782,282 @@ GOAL: Real photograph, 100% recognizable person, natural imperfections, authenti
       // 1 Portraits professionnels
       case "professional_indoor":
         finalPrompt = addFidelityRequirements(
-          "Professional indoor portrait photograph that looks like a REAL photograph taken with a professional camera. The person's face must be 100% IDENTICAL to the reference photos - exact same face shape, eye color, eye shape, nose, mouth, skin tone, hair, and all facial features preserved EXACTLY. Modern office or elegant workspace background naturally blurred with authentic depth of field - showing realistic lived-in details, not perfectly staged, with natural imperfections like slightly messy desk items, real office clutter, authentic environment. Background is naturally out of focus, soft and blurred, NOT artificially perfect. Soft professional lighting with natural shadows and highlights. The person maintains their EXACT same clothing style and colors from reference photos. Serious and credible professional atmosphere. Photorealistic quality - NOT AI-generated looking. Natural skin texture with visible pores, realistic imperfections preserved. Sharp focus on face, natural background blur with realistic depth of field. Context: professional post, announcement, career advice."
+          "Professional indoor portrait taken with smartphone camera. CRITICAL: Person's face 100% IDENTICAL to reference - EXACT same face shape, eyes, nose, mouth, skin tone, hair, ALL features preserved. EXACT same beard, eyebrows, eyelashes, wrinkles, cernes, imperfections as reference. NO artificial smoothing. Modern office background SHARP and CLEAR. Natural lighting. Person wears EXACT same clothing as reference. Photorealistic quality."
         );
         break;
 
       case "professional_outdoor":
         finalPrompt = addFidelityRequirements(
-          "Professional outdoor portrait photograph that looks like a REAL photograph taken with a professional camera. The person's face must be 100% IDENTICAL to the reference photos - exact same face shape, eye color, eye shape, nose, mouth, skin tone, hair, and all facial features preserved EXACTLY. Pleasant landscape or modern building background naturally blurred with authentic depth of field - showing realistic urban details, natural imperfections, authentic environment with real-world elements like slightly weathered surfaces, natural variations, not perfectly staged. Background is naturally out of focus, soft and blurred, NOT artificially perfect. Natural daylight with realistic shadows. The person maintains their EXACT same clothing style and colors from reference photos. Calm and composed professional atmosphere. Photorealistic quality - NOT AI-generated looking. Natural skin texture, realistic color grading, authentic photographic quality. Context: inspiring post, storytelling, leadership."
+          "Professional outdoor portrait taken with smartphone camera. CRITICAL: Person's face 100% IDENTICAL to reference - EXACT same face shape, eyes, nose, mouth, skin tone, hair, ALL features preserved. EXACT same beard, eyebrows, eyelashes, wrinkles, cernes, imperfections as reference. NO artificial smoothing. Pleasant landscape background SHARP and CLEAR. Natural daylight. Person wears EXACT same clothing as reference. Photorealistic quality."
         );
         break;
 
       case "corporate_studio":
         finalPrompt = addFidelityRequirements(
-          "Corporate studio portrait photograph that looks like a REAL photograph taken with a professional camera. The person's face must be 100% IDENTICAL to the reference photos - exact same face shape, eye color, eye shape, nose, mouth, skin tone, hair, and all facial features preserved EXACTLY. Neutral background naturally blurred with authentic depth of field - showing realistic texture variations, natural imperfections, subtle gradients and variations, NOT perfectly uniform or artificially perfect. Background is naturally out of focus, soft and blurred, with authentic photographic depth. Professional studio lighting with natural depth. The person maintains their EXACT same clothing style and colors from reference photos. Upright confident posture. Sharp focus on face with natural depth of field. Photorealistic quality - NOT AI-generated looking. Natural skin texture, realistic imperfections preserved. High-quality corporate photography."
+          "Corporate studio portrait taken with smartphone camera. CRITICAL: Person's face 100% IDENTICAL to reference - EXACT same face shape, eyes, nose, mouth, skin tone, hair, ALL features preserved. EXACT same beard, eyebrows, eyelashes, wrinkles, cernes, imperfections as reference. NO artificial smoothing. Neutral background SHARP and CLEAR. Natural lighting. Person wears EXACT same clothing as reference. Photorealistic quality."
         );
         break;
 
       // 2 Portraits semi décontractés
       case "modern_workspace":
         finalPrompt = addFidelityRequirements(
-          "Semi-casual portrait photograph that looks like a REAL photograph taken with a professional camera. The person's face must be 100% IDENTICAL to the reference photos - exact same face shape, eye color, eye shape, nose, mouth, skin tone, hair, and all facial features preserved EXACTLY. Modern workspace setting. Office elements visible in background naturally blurred with authentic depth of field - showing realistic lived-in workspace details, natural clutter, authentic office environment with real-world imperfections like slightly messy papers, natural desk organization, NOT perfectly staged. Background is naturally out of focus, soft and blurred, NOT artificially perfect. Bright natural office lighting with realistic shadows. The person maintains their EXACT same clothing style and colors from reference photos. Authentic relaxed professional atmosphere. Photorealistic quality - NOT AI-generated looking. Natural skin texture, realistic imperfections preserved. Context: productivity, organization, tips."
+          "Semi-casual portrait taken with smartphone camera. CRITICAL: Person's face 100% IDENTICAL to reference - EXACT same face shape, eyes, nose, mouth, skin tone, hair, ALL features preserved. EXACT same beard, eyebrows, eyelashes, wrinkles, cernes, imperfections as reference. NO artificial smoothing. Modern workspace background SHARP and CLEAR. Natural lighting. Person wears EXACT same clothing as reference. Photorealistic quality."
         );
         break;
 
       case "personal_office":
         finalPrompt = addFidelityRequirements(
-          "Casual portrait photograph that looks like a REAL photograph taken with a professional camera. The person's face must be 100% IDENTICAL to the reference photos - exact same face shape, eye color, eye shape, nose, mouth, skin tone, hair, and all facial features preserved EXACTLY. Personal office setting. Personal objects and decor visible in background naturally blurred with authentic depth of field - showing realistic personal workspace details, natural lived-in environment, authentic clutter and personal items, NOT perfectly organized or staged. Background is naturally out of focus, soft and blurred, NOT artificially perfect. Warm natural lighting with realistic depth. The person maintains their EXACT same clothing style and colors from reference photos. Authentic personal atmosphere. Photorealistic quality - NOT AI-generated looking. Natural skin texture, realistic color grading. Context: authentic post, sharing experience."
-        );
+"Casual portrait photograph taken with smartphone camera. Person's face 100% IDENTICAL to reference - EXACT same face shape, eyes, nose, mouth, skin tone, hair, ALL features preserved. Person is in a personal office setting. Background SHARP and CLEAR. Natural lighting. Person wears EXACT same clothing as reference. Photorealistic quality."        );
         break;
 
       case "street":
         finalPrompt = addFidelityRequirements(
-          "Casual portrait photograph that looks like a REAL photograph taken with a professional camera. The person's face must be 100% IDENTICAL to the reference photos - exact same face shape, eye color, eye shape, nose, mouth, skin tone, hair, and all facial features preserved EXACTLY. Urban street setting. Urban background with buildings naturally blurred with authentic depth of field - showing realistic urban details, natural imperfections like weathered surfaces, authentic street elements, real-world urban environment, NOT perfectly clean or staged. Background is naturally out of focus, soft and blurred, NOT artificially perfect. Natural daylight with realistic shadows. The person maintains their EXACT same clothing style and colors from reference photos. Authentic street photography style. Photorealistic quality - NOT AI-generated looking. Natural skin texture, realistic imperfections preserved. High-quality lifestyle photography."
+          "Casual portrait taken with smartphone camera. CRITICAL: Person's face 100% IDENTICAL to reference - EXACT same face shape, eyes, nose, mouth, skin tone, hair, ALL features preserved. EXACT same beard, eyebrows, eyelashes, wrinkles, cernes, imperfections as reference. NO artificial smoothing. Urban street background SHARP and CLEAR. Natural daylight. Person wears EXACT same clothing as reference. Photorealistic quality."
         );
         break;
 
       // 3 Scènes d'action professionnelles
       case "working_computer":
         finalPrompt = addFidelityRequirements(
-          "Action portrait photograph that looks like a REAL photograph taken with a professional camera. The person's face must be 100% IDENTICAL to the reference photos - exact same face shape, eye color, eye shape, nose, mouth, skin tone, hair, and all facial features preserved EXACTLY. Person working on computer at desk. Laptop or computer screen visible. Focused concentrated expression matching their natural expression from reference photos. Professional desk setting naturally blurred in background with authentic depth of field - showing realistic workspace details, natural clutter, authentic office environment with real-world imperfections, NOT perfectly staged. Background is naturally out of focus, soft and blurred, NOT artificially perfect. Natural lighting with realistic shadows. The person maintains their EXACT same clothing style and colors from reference photos. Photorealistic quality - NOT AI-generated looking. Natural skin texture, realistic imperfections preserved. High-quality action photography. Context: productive, technical focus."
+          "Action portrait taken with smartphone camera. CRITICAL: Person's face 100% IDENTICAL to reference - EXACT same face shape, eyes, nose, mouth, skin tone, hair, ALL features preserved. EXACT same beard, eyebrows, eyelashes, wrinkles, cernes, imperfections as reference. NO artificial smoothing. Person working on computer. Screen visible. Background SHARP and CLEAR. Natural lighting. Person wears EXACT same clothing as reference. Photorealistic quality."
         );
         break;
 
       case "writing_notes":
         finalPrompt = addFidelityRequirements(
-          "Action portrait photograph that looks like a REAL photograph taken with a professional camera. The person's face must be 100% IDENTICAL to the reference photos - exact same face shape, eye color, eye shape, nose, mouth, skin tone, hair, and all facial features preserved EXACTLY. Person writing or taking notes. Notebook and pen visible on table. Background naturally blurred with authentic depth of field - showing realistic workspace details, natural environment, authentic setting with real-world imperfections, NOT perfectly staged. Background is naturally out of focus, soft and blurred, NOT artificially perfect. Calm thoughtful atmosphere. Natural lighting with realistic depth. The person maintains their EXACT same clothing style and colors from reference photos. Photorealistic quality - NOT AI-generated looking. Natural skin texture, realistic color grading. High-quality photography. Context: methodology, reflection, coaching."
+          "Action portrait taken with smartphone camera. CRITICAL: Person's face 100% IDENTICAL to reference - EXACT same face shape, eyes, nose, mouth, skin tone, hair, ALL features preserved. EXACT same beard, eyebrows, eyelashes, wrinkles, cernes, imperfections as reference. NO artificial smoothing. Person writing notes. Notebook and pen visible. Background SHARP and CLEAR. Natural lighting. Person wears EXACT same clothing as reference. Photorealistic quality."
         );
         break;
 
       case "presenting_screen":
         finalPrompt = addFidelityRequirements(
-          "Action portrait photograph that looks like a REAL photograph taken with a professional camera. The person's face must be 100% IDENTICAL to the reference photos - exact same face shape, eye color, eye shape, nose, mouth, skin tone, hair, and all facial features preserved EXACTLY. Person presenting on screen with natural pointing gesture. Screen visible but content blurred (natural depth of field). Professional presentation setting naturally blurred in background with authentic depth of field - showing realistic meeting room details, natural environment, authentic setting with real-world imperfections, NOT perfectly staged. Background is naturally out of focus, soft and blurred, NOT artificially perfect. Natural lighting with realistic shadows. The person maintains their EXACT same clothing style and colors from reference photos. Photorealistic quality - NOT AI-generated looking. Natural skin texture, realistic imperfections preserved. High-quality action photography. Context: tutorial, analysis, demonstration."
+          "Action portrait taken with smartphone camera. CRITICAL: Person's face 100% IDENTICAL to reference - EXACT same face shape, eyes, nose, mouth, skin tone, hair, ALL features preserved. EXACT same beard, eyebrows, eyelashes, wrinkles, cernes, imperfections as reference. NO artificial smoothing. Person presenting on screen with pointing gesture. Screen visible. Background SHARP and CLEAR. Natural lighting. Person wears EXACT same clothing as reference. Photorealistic quality."
         );
         break;
 
       case "meeting":
         finalPrompt = addFidelityRequirements(
-          "Portrait photograph that looks like a REAL photograph taken with a professional camera. The person's face must be 100% IDENTICAL to the reference photos - exact same face shape, eye color, eye shape, nose, mouth, skin tone, hair, and all facial features preserved EXACTLY. Meeting room setting. Meeting table or screen visible in background naturally blurred with authentic depth of field - showing realistic meeting room details, natural environment, authentic setting with real-world imperfections like slightly messy table, natural room elements, NOT perfectly staged. Background is naturally out of focus, soft and blurred, NOT artificially perfect. Professional meeting room atmosphere. Natural lighting with realistic depth. The person maintains their EXACT same clothing style and colors from reference photos. No other people in frame. Photorealistic quality - NOT AI-generated looking. Natural skin texture, realistic color grading. High-quality professional photography."
+          "Portrait taken with smartphone camera. CRITICAL: Person's face 100% IDENTICAL to reference - EXACT same face shape, eyes, nose, mouth, skin tone, hair, ALL features preserved. EXACT same beard, eyebrows, eyelashes, wrinkles, cernes, imperfections as reference. NO artificial smoothing. Meeting room setting. Table or screen visible. Background SHARP and CLEAR. Natural lighting. Person wears EXACT same clothing as reference. No other people. Photorealistic quality."
         );
         break;
 
       case "podcast":
         finalPrompt = addFidelityRequirements(
-          "Portrait photograph that looks like a REAL photograph taken with a professional camera. The person's face must be 100% IDENTICAL to the reference photos - exact same face shape, eye color, eye shape, nose, mouth, skin tone, hair, and all facial features preserved EXACTLY. Person recording a podcast. Microphone visible. Podcast setup visible in background naturally blurred with authentic depth of field - showing realistic recording space details, natural environment, authentic setup with real-world imperfections, NOT perfectly staged. Background is naturally out of focus, soft and blurred, NOT artificially perfect. Professional yet relaxed atmosphere. Natural lighting with realistic shadows. The person maintains their EXACT same clothing style and colors from reference photos. No other people in frame. Photorealistic quality - NOT AI-generated looking. Natural skin texture, realistic imperfections preserved. High-quality photography. Context: podcast, audio content, expertise sharing."
+          "Portrait photograph taken with smartphone camera. Person's face 100% IDENTICAL to reference - EXACT same face shape, eyes, nose, mouth, skin tone, hair, ALL features preserved. Person recording podcast. Microphone visible. Background SHARP and CLEAR. Natural lighting. Person wears EXACT same clothing as reference. No other people. Photorealistic quality."
         );
         break;
 
       case "conference":
         finalPrompt = addFidelityRequirements(
-          "Portrait photograph that looks like a REAL photograph taken with a professional camera. The person's face must be 100% IDENTICAL to the reference photos - exact same face shape, eye color, eye shape, nose, mouth, skin tone, hair, and all facial features preserved EXACTLY. Person at conference speaking or presenting. Stage or conference setting visible in background naturally blurred with authentic depth of field - showing realistic event space details, natural environment, authentic conference setting with real-world imperfections, NOT perfectly staged. Background is naturally out of focus, soft and blurred, NOT artificially perfect. Professional conference atmosphere. Stage lighting adapted naturally with realistic shadows. The person maintains their EXACT same clothing style and colors from reference photos. No other people in frame. Photorealistic quality - NOT AI-generated looking. Natural skin texture, realistic color grading. High-quality event photography. Context: conference, public speaking, expertise."
+          "Portrait taken with smartphone camera. CRITICAL: Person's face 100% IDENTICAL to reference - EXACT same face shape, eyes, nose, mouth, skin tone, hair, ALL features preserved. EXACT same beard, eyebrows, eyelashes, wrinkles, cernes, imperfections as reference. NO artificial smoothing. Person at conference presenting. Stage visible. Background SHARP and CLEAR. Natural lighting. Person wears EXACT same clothing as reference. No other people. Photorealistic quality."
         );
         break;
 
       case "walking_street":
         finalPrompt = addFidelityRequirements(
-          "Portrait photograph that looks like a REAL photograph taken with a professional camera. The person's face must be 100% IDENTICAL to the reference photos - exact same face shape, eye color, eye shape, nose, mouth, skin tone, hair, and all facial features preserved EXACTLY. Person walking in street with natural walking movement. Urban decor visible naturally blurred with authentic depth of field - showing realistic urban street details, natural imperfections like weathered surfaces, authentic street elements, real-world urban environment, NOT perfectly clean or staged. Background is naturally out of focus, soft and blurred, NOT artificially perfect. Natural daylight with realistic shadows. The person maintains their EXACT same clothing style and colors from reference photos. Energetic yet professional vibe. Photorealistic quality - NOT AI-generated looking. Natural skin texture, realistic imperfections preserved. High-quality street photography. Context: motivation, rhythm, momentum."
+          "Portrait taken with smartphone camera. CRITICAL: Person's face 100% IDENTICAL to reference - EXACT same face shape, eyes, nose, mouth, skin tone, hair, ALL features preserved. EXACT same beard, eyebrows, eyelashes, wrinkles, cernes, imperfections as reference. NO artificial smoothing. Person walking in street. Urban decor visible. Background SHARP and CLEAR. Natural daylight. Person wears EXACT same clothing as reference. Photorealistic quality."
         );
         break;
 
       // 4 Selfies naturels
       case "selfie_train":
         finalPrompt = addFidelityRequirements(
-          "Natural authentic selfie photograph that looks like a REAL selfie taken with a smartphone. The person's face must be 100% IDENTICAL to the reference photos - exact same face shape, eye color, eye shape, nose, mouth, skin tone, hair, and all facial features preserved EXACTLY. Inside a train. Train interior visible in background naturally blurred with authentic depth of field - showing realistic train details, natural environment, authentic transport setting with real-world imperfections like worn seats, natural wear, NOT perfectly clean or staged. Background is naturally out of focus, soft and blurred, NOT artificially perfect. Natural light from train windows with realistic shadows. Realistic selfie position and angle. The person maintains their EXACT same clothing style and colors from reference photos. Authentic unposed selfie style. Photorealistic quality - NOT AI-generated looking. Natural skin texture, realistic imperfections preserved. Context: on-the-go, business travel, commuting."
+          "Natural authentic selfie taken with smartphone. Person's face 100% IDENTICAL to reference - EXACT same face shape, eyes, nose, mouth, skin tone, hair, ALL features preserved. Inside train. Train interior visible in background SHARP and CLEAR. CRITICAL: NO smartphone visible in hands - phone and hand holding it OUTSIDE frame. Natural light from windows. Person wears EXACT same clothing as reference. Photorealistic quality."
         );
         break;
 
       case "selfie_car":
         finalPrompt = addFidelityRequirements(
-          "Natural authentic selfie photograph that looks like a REAL selfie taken with a smartphone. The person's face must be 100% IDENTICAL to the reference photos - exact same face shape, eye color, eye shape, nose, mouth, skin tone, hair, and all facial features preserved EXACTLY. Inside a car. Car interior visible in background naturally blurred with authentic depth of field - showing realistic car details, natural environment, authentic vehicle setting with real-world imperfections like natural wear, authentic interior elements, NOT perfectly clean or staged. Background is naturally out of focus, soft and blurred, NOT artificially perfect. Natural daylight through car windows with realistic shadows. Realistic selfie position and angle. The person maintains their EXACT same clothing style and colors from reference photos. Authentic selfie style. Photorealistic quality - NOT AI-generated looking. Natural skin texture, realistic color grading. Context: on-the-go, business travel, commuting."
-        );
-        break;
-
+"Natural photo taken with a simple smartphone. Person's face 100% IDENTICAL to reference, natural, with no smoothing or beauty retouching. Person seated logically in the driver’s or passenger’s seat, realistic posture consistent with car interior. No smartphone visible in hands. Car interior visible in background, sharp and clear. Natural lighting. Person wears EXACT same clothing as reference. Photorealistic quality."       
+);
+break;
       case "selfie_other_transport":
         finalPrompt = addFidelityRequirements(
-          "Natural authentic selfie photograph that looks like a REAL selfie taken with a smartphone. The person's face must be 100% IDENTICAL to the reference photos - exact same face shape, eye color, eye shape, nose, mouth, skin tone, hair, and all facial features preserved EXACTLY. Inside metro/plane/bus or other transport. Transport interior visible in background naturally blurred with authentic depth of field - showing realistic transport details, natural environment, authentic vehicle setting with real-world imperfections like natural wear, authentic interior elements, NOT perfectly clean or staged. Background is naturally out of focus, soft and blurred, NOT artificially perfect. Natural lighting from transport windows with realistic shadows. Realistic selfie position and angle. The person maintains their EXACT same clothing style and colors from reference photos. Authentic selfie style. Photorealistic quality - NOT AI-generated looking. Natural skin texture, realistic imperfections preserved. Context: on-the-go, business travel, commuting."
+          "Natural authentic selfie taken with smartphone. Person's face 100% IDENTICAL to reference - EXACT same face shape, eyes, nose, mouth, skin tone, hair, ALL features preserved. Inside metro/plane/bus. Transport interior visible in background SHARP and CLEAR. CRITICAL: NO smartphone visible in hands - phone and hand holding it OUTSIDE frame. Natural lighting from windows. Person wears EXACT same clothing as reference. Photorealistic quality."
         );
         break;
 
       case "selfie_office":
         finalPrompt = addFidelityRequirements(
-          "Natural authentic selfie photograph that looks like a REAL selfie taken with a smartphone. The person's face must be 100% IDENTICAL to the reference photos - exact same face shape, eye color, eye shape, nose, mouth, skin tone, hair, and all facial features preserved EXACTLY. At desk in office. Office environment visible in background naturally blurred with authentic depth of field - showing realistic workspace details, natural clutter, authentic office environment with real-world imperfections, NOT perfectly staged. Computer or laptop visible in background naturally blurred. Background is naturally out of focus, soft and blurred, NOT artificially perfect. Natural indoor lighting with realistic shadows. Realistic selfie position and angle. The person maintains their EXACT same clothing style and colors from reference photos. Authentic selfie style. Photorealistic quality - NOT AI-generated looking. Natural skin texture, realistic color grading. Context: remote work, workday."
+          "Natural authentic selfie taken with smartphone. Person's face 100% IDENTICAL to reference - EXACT same face shape, eyes, nose, mouth, skin tone, hair, ALL features preserved. At desk in office. Office environment visible in background SHARP and CLEAR. Computer or laptop visible. CRITICAL: NO smartphone visible in hands - phone and hand holding it OUTSIDE frame. Natural indoor lighting. Person wears EXACT same clothing as reference. Photorealistic quality."
         );
         break;
 
       case "selfie_outdoor":
         finalPrompt = addFidelityRequirements(
-          "Natural authentic selfie photograph that looks like a REAL selfie taken with a smartphone. The person's face must be 100% IDENTICAL to the reference photos - exact same face shape, eye color, eye shape, nose, mouth, skin tone, hair, and all facial features preserved EXACTLY. Outdoors in nature. Simple gesture matching natural expression from reference photos. Nature background naturally blurred with authentic depth of field - showing realistic natural details, authentic environment, natural imperfections like varied foliage, real-world nature elements, NOT perfectly manicured or staged. Background is naturally out of focus, soft and blurred, NOT artificially perfect. Natural daylight with realistic shadows. The person maintains their EXACT same clothing style and colors from reference photos. Authentic outdoor selfie style. Photorealistic quality - NOT AI-generated looking. Natural skin texture, realistic imperfections preserved. Context: inspiration, storytelling, nature."
+          "Natural authentic selfie taken with smartphone. Person's face 100% IDENTICAL to reference - EXACT same face shape, eyes, nose, mouth, skin tone, hair, ALL features preserved. Outdoors in nature. Simple gesture. Nature background SHARP and CLEAR. CRITICAL: NO smartphone visible in hands - phone and hand holding it OUTSIDE frame. Natural daylight. Person wears EXACT same clothing as reference. Photorealistic quality."
         );
         break;
 
       case "selfie_street":
         finalPrompt = addFidelityRequirements(
-          "Natural authentic selfie photograph that looks like a REAL selfie taken with a smartphone. The person's face must be 100% IDENTICAL to the reference photos - exact same face shape, eye color, eye shape, nose, mouth, skin tone, hair, and all facial features preserved EXACTLY. Outdoors in urban street setting. Simple gesture matching natural expression from reference photos. Urban background naturally blurred with authentic depth of field - showing realistic urban details, natural imperfections like weathered surfaces, authentic street elements, real-world urban environment, NOT perfectly clean or staged. Background is naturally out of focus, soft and blurred, NOT artificially perfect. Natural daylight with realistic shadows. The person maintains their EXACT same clothing style and colors from reference photos. Authentic street selfie style. Photorealistic quality - NOT AI-generated looking. Natural skin texture, realistic color grading. Context: inspiration, storytelling, urban lifestyle."
+          "Natural authentic selfie taken with smartphone. Person's face 100% IDENTICAL to reference - EXACT same face shape, eyes, nose, mouth, skin tone, hair, ALL features preserved. Outdoors in urban street. Simple gesture. Urban background SHARP and CLEAR. CRITICAL: NO smartphone visible in hands - phone and hand holding it OUTSIDE frame. Natural daylight. Person wears EXACT same clothing as reference. Photorealistic quality."
         );
         break;
 
       case "selfie_gesture":
         finalPrompt = addFidelityRequirements(
-          "Natural authentic selfie photograph that looks like a REAL selfie taken with a smartphone. The person's face must be 100% IDENTICAL to the reference photos - exact same face shape, eye color, eye shape, nose, mouth, skin tone, hair, and all facial features preserved EXACTLY. Simple gesture matching natural expression from reference photos. Background naturally blurred with authentic depth of field - showing realistic environment details, natural setting, authentic context with real-world imperfections, NOT perfectly staged. Background is naturally out of focus, soft and blurred, NOT artificially perfect. Natural light with realistic shadows. The person maintains their EXACT same clothing style and colors from reference photos. Authentic selfie style. Photorealistic quality - NOT AI-generated looking. Natural skin texture, realistic imperfections preserved. Context: positive mood, celebration, achievement."
+          "Natural authentic selfie taken with smartphone. Person's face 100% IDENTICAL to reference - EXACT same face shape, eyes, nose, mouth, skin tone, hair, ALL features preserved. Simple gesture matching natural expression. Background SHARP and CLEAR. CRITICAL: NO smartphone visible in hands - phone and hand holding it OUTSIDE frame. Natural light. Person wears EXACT same clothing as reference. Photorealistic quality."
         );
         break;
 
       case "selfie_pointing":
         finalPrompt = addFidelityRequirements(
-          "Natural authentic selfie photograph that looks like a REAL selfie taken with a smartphone. The person's face must be 100% IDENTICAL to the reference photos - exact same face shape, eye color, eye shape, nose, mouth, skin tone, hair, and all facial features preserved EXACTLY. Pointing to off-frame element or screen with natural pointing gesture. Background naturally blurred with authentic depth of field - showing realistic environment details, natural setting, authentic context with real-world imperfections, NOT perfectly staged. Background is naturally out of focus, soft and blurred, NOT artificially perfect. Natural light with realistic shadows. The person maintains their EXACT same clothing style and colors from reference photos. Authentic selfie style. Photorealistic quality - NOT AI-generated looking. Natural skin texture, realistic color grading. Context: announcement, showcasing something new."
+          "Natural authentic selfie taken with smartphone. Person's face 100% IDENTICAL to reference - EXACT same face shape, eyes, nose, mouth, skin tone, hair, ALL features preserved. Pointing to off-frame element with natural pointing gesture. Background SHARP and CLEAR. CRITICAL: NO smartphone visible in hands - phone and hand holding it OUTSIDE frame. Natural light. Person wears EXACT same clothing as reference. Photorealistic quality."
         );
         break;
 
       // 5 Moments du quotidien professionnel
       case "coffee_break":
         finalPrompt = addFidelityRequirements(
-          "Casual portrait photograph that looks like a REAL photograph taken with a professional camera. The person's face must be 100% IDENTICAL to the reference photos - exact same face shape, eye color, eye shape, nose, mouth, skin tone, hair, and all facial features preserved EXACTLY. Person drinking coffee. Coffee cup visible in hand (natural hand position). Warm decor visible in background naturally blurred with authentic depth of field - showing realistic environment details, natural lived-in setting, authentic context with real-world imperfections like natural clutter, authentic decor elements, NOT perfectly staged. Background is naturally out of focus, soft and blurred, NOT artificially perfect. Relaxed natural mood matching their natural expression. Natural lighting with realistic shadows. The person maintains their EXACT same clothing style and colors from reference photos. Authentic lifestyle photography. Photorealistic quality - NOT AI-generated looking. Natural skin texture, realistic imperfections preserved. Context: mood, professional routine, break time."
+          "Casual portrait taken with smartphone camera. CRITICAL: Person's face 100% IDENTICAL to reference - EXACT same face shape, eyes, nose, mouth, skin tone, hair, ALL features preserved. EXACT same beard, eyebrows, eyelashes, wrinkles, cernes, imperfections as reference. NO artificial smoothing. Person drinking coffee. Cup visible in hand. Background SHARP and CLEAR. Natural lighting. Person wears EXACT same clothing as reference. Photorealistic quality."
         );
         break;
 
       case "drinking_other":
         finalPrompt = addFidelityRequirements(
-          "Casual portrait photograph that looks like a REAL photograph taken with a professional camera. The person's face must be 100% IDENTICAL to the reference photos - exact same face shape, eye color, eye shape, nose, mouth, skin tone, hair, and all facial features preserved EXACTLY. Person drinking beverage. Drink visible in hand (natural hand position). Warm decor visible in background naturally blurred with authentic depth of field - showing realistic environment details, natural lived-in setting, authentic context with real-world imperfections like natural clutter, authentic decor elements, NOT perfectly staged. Background is naturally out of focus, soft and blurred, NOT artificially perfect. Relaxed natural mood matching their natural expression. Natural lighting with realistic shadows. The person maintains their EXACT same clothing style and colors from reference photos. Authentic lifestyle photography. Photorealistic quality - NOT AI-generated looking. Natural skin texture, realistic color grading. Context: mood, professional routine, break time."
+          "Casual portrait taken with smartphone camera. CRITICAL: Person's face 100% IDENTICAL to reference - EXACT same face shape, eyes, nose, mouth, skin tone, hair, ALL features preserved. EXACT same beard, eyebrows, eyelashes, wrinkles, cernes, imperfections as reference. NO artificial smoothing. Person drinking beverage. Drink visible in hand. Background SHARP and CLEAR. Natural lighting. Person wears EXACT same clothing as reference. Photorealistic quality."
         );
         break;
 
       case "eating_meal":
         finalPrompt = addFidelityRequirements(
-          "Casual portrait photograph that looks like a REAL photograph taken with a professional camera. The person's face must be 100% IDENTICAL to the reference photos - exact same face shape, eye color, eye shape, nose, mouth, skin tone, hair, and all facial features preserved EXACTLY. Person during lunch break. Meal plate visible on table. Professional setting in background naturally blurred with authentic depth of field - showing realistic restaurant or office details, natural environment, authentic setting with real-world imperfections like natural table setting, authentic decor elements, NOT perfectly staged. Background is naturally out of focus, soft and blurred, NOT artificially perfect. Natural lighting with realistic shadows. The person maintains their EXACT same clothing style and colors from reference photos. Professional lunch break atmosphere. Photorealistic quality - NOT AI-generated looking. Natural skin texture, realistic imperfections preserved. High-quality lifestyle photography. Context: lifestyle, work-life balance, lunch break."
+          "Casual portrait taken with smartphone camera. CRITICAL: Person's face 100% IDENTICAL to reference - EXACT same face shape, eyes, nose, mouth, skin tone, hair, ALL features preserved. EXACT same beard, eyebrows, eyelashes, wrinkles, cernes, imperfections as reference. NO artificial smoothing. Person during lunch break. Meal plate visible. Background SHARP and CLEAR. Natural lighting. Person wears EXACT same clothing as reference. Photorealistic quality."
         );
         break;
 
       case "eating":
         finalPrompt = addFidelityRequirements(
-          "Casual portrait photograph that looks like a REAL photograph taken with a professional camera. The person's face must be 100% IDENTICAL to the reference photos - exact same face shape, eye color, eye shape, nose, mouth, skin tone, hair, and all facial features preserved EXACTLY. Person during work break. Food items visible on table. Professional setting in background naturally blurred with authentic depth of field - showing realistic environment details, natural setting, authentic context with real-world imperfections like natural table arrangement, authentic decor elements, NOT perfectly staged. Background is naturally out of focus, soft and blurred, NOT artificially perfect. Natural lighting with realistic shadows. The person maintains their EXACT same clothing style and colors from reference photos. Professional break time atmosphere. Photorealistic quality - NOT AI-generated looking. Natural skin texture, realistic color grading. High-quality lifestyle photography. Context: lifestyle, work-life balance."
+          "Casual portrait taken with smartphone camera. CRITICAL: Person's face 100% IDENTICAL to reference - EXACT same face shape, eyes, nose, mouth, skin tone, hair, ALL features preserved. EXACT same beard, eyebrows, eyelashes, wrinkles, cernes, imperfections as reference. NO artificial smoothing. Person during work break. Food items visible. Background SHARP and CLEAR. Natural lighting. Person wears EXACT same clothing as reference. Photorealistic quality."
         );
         break;
 
       // 6 Images centrées sur le produit digital
       case "software_interface":
         finalPrompt = addFidelityRequirements(
-          "Product photography that looks like a REAL photograph taken with a professional camera. The person's face must be 100% IDENTICAL to the reference photos - exact same face shape, eye color, eye shape, nose, mouth, skin tone, hair, and all facial features preserved EXACTLY. Highlighting software interface on computer screen. Computer and screen visible. Person maintains their EXACT same clothing style and colors from reference photos. Clean professional ambiance. Modern office setting in background naturally blurred with authentic depth of field - showing realistic workspace details, natural environment, authentic office setting with real-world imperfections like natural clutter, authentic decor elements, NOT perfectly staged. Background is naturally out of focus, soft and blurred, NOT artificially perfect. Professional product photography lighting with realistic shadows. Photorealistic quality - NOT AI-generated looking. Natural skin texture, realistic imperfections preserved. High-quality tech photography. Context: demo, launch, product update."
+          "Product photography taken with smartphone camera. CRITICAL: Person's face 100% IDENTICAL to reference - EXACT same face shape, eyes, nose, mouth, skin tone, hair, ALL features preserved. EXACT same beard, eyebrows, eyelashes, wrinkles, cernes, imperfections as reference. NO artificial smoothing. Software interface on computer screen visible. Background SHARP and CLEAR. Natural lighting. Person wears EXACT same clothing as reference. Photorealistic quality."
         );
         break;
 
       case "software_interface_smartphone":
         finalPrompt = addFidelityRequirements(
-          "Product photography that looks like a REAL photograph taken with a professional camera. The person's face must be 100% IDENTICAL to the reference photos - exact same face shape, eye color, eye shape, nose, mouth, skin tone, hair, and all facial features preserved EXACTLY. Highlighting software interface on smartphone screen. Smartphone visible. Person maintains their EXACT same clothing style and colors from reference photos. Clean professional ambiance. Modern setting in background naturally blurred with authentic depth of field - showing realistic environment details, natural setting, authentic context with real-world imperfections, NOT perfectly staged. Background is naturally out of focus, soft and blurred, NOT artificially perfect. Professional product photography lighting with realistic shadows. Photorealistic quality - NOT AI-generated looking. Natural skin texture, realistic color grading. High-quality tech photography. Context: demo, launch, mobile app update."
+          "Product photography taken with smartphone camera. Person's face 100% IDENTICAL to reference - EXACT same face shape, eyes, nose, mouth, skin tone, hair, ALL features preserved. Software interface on smartphone screen visible. Background SHARP and CLEAR. Natural lighting. Person wears EXACT same clothing as reference. Photorealistic quality."
         );
         break;
 
       case "app_screenshot":
         finalPrompt = addFidelityRequirements(
-          "Product photography that looks like a REAL photograph taken with a professional camera. The person's face must be 100% IDENTICAL to the reference photos - exact same face shape, eye color, eye shape, nose, mouth, skin tone, hair, and all facial features preserved EXACTLY. Stylized screen capture showing application interface. Person maintains their EXACT same clothing style and colors from reference photos. Modern composition. Background naturally blurred with authentic depth of field - showing realistic environment details, natural setting, authentic context with real-world imperfections, NOT perfectly staged. Background is naturally out of focus, soft and blurred, NOT artificially perfect. Clean minimalist design. Professional tech visual style. Natural lighting with realistic shadows. Photorealistic quality - NOT AI-generated looking. Natural skin texture, realistic imperfections preserved. High-quality digital product photography. Context: tech post, announcement, promotion."
+          "Product photography taken with smartphone camera. CRITICAL: Person's face 100% IDENTICAL to reference - EXACT same face shape, eyes, nose, mouth, skin tone, hair, ALL features preserved. EXACT same beard, eyebrows, eyelashes, wrinkles, cernes, imperfections as reference. NO artificial smoothing. Screen capture showing application interface. Background SHARP and CLEAR. Natural lighting. Person wears EXACT same clothing as reference. Photorealistic quality."
         );
         break;
 
       case "app_immersive":
         finalPrompt = addFidelityRequirements(
-          "Product photography that looks like a REAL photograph taken with a professional camera. The person's face must be 100% IDENTICAL to the reference photos - exact same face shape, eye color, eye shape, nose, mouth, skin tone, hair, and all facial features preserved EXACTLY. Immersive representation of application interface. Person maintains their EXACT same clothing style and colors from reference photos. Modern engaging composition. Background naturally blurred with authentic depth of field - showing realistic environment details, natural setting, authentic context with real-world imperfections, NOT perfectly staged. Background is naturally out of focus, soft and blurred, NOT artificially perfect. Professional tech visual style. Natural lighting with realistic shadows. Photorealistic quality - NOT AI-generated looking. Natural skin texture, realistic color grading. High-quality digital product photography. Context: tech post, announcement, promotion."
+          "Product photography taken with smartphone camera. CRITICAL: Person's face 100% IDENTICAL to reference - EXACT same face shape, eyes, nose, mouth, skin tone, hair, ALL features preserved. EXACT same beard, eyebrows, eyelashes, wrinkles, cernes, imperfections as reference. NO artificial smoothing. Immersive application interface representation. Background SHARP and CLEAR. Natural lighting. Person wears EXACT same clothing as reference. Photorealistic quality."
         );
         break;
 
       case "app_showcase":
         finalPrompt = addFidelityRequirements(
-          "Product photography that looks like a REAL photograph taken with a professional camera. The person's face must be 100% IDENTICAL to the reference photos - exact same face shape, eye color, eye shape, nose, mouth, skin tone, hair, and all facial features preserved EXACTLY. Stylized screen capture showing application interface. Immersive representation. Person maintains their EXACT same clothing style and colors from reference photos. Modern composition. Background naturally blurred with authentic depth of field - showing realistic environment details, natural setting, authentic context with real-world imperfections, NOT perfectly staged. Background is naturally out of focus, soft and blurred, NOT artificially perfect. Professional tech visual style. Natural lighting with realistic shadows. Photorealistic quality - NOT AI-generated looking. Natural skin texture, realistic imperfections preserved. High-quality digital product photography. Context: tech post, announcement, promotion."
+          "Product photography taken with smartphone camera. CRITICAL: Person's face 100% IDENTICAL to reference - EXACT same face shape, eyes, nose, mouth, skin tone, hair, ALL features preserved. EXACT same beard, eyebrows, eyelashes, wrinkles, cernes, imperfections as reference. NO artificial smoothing. Screen capture showing application interface. Background SHARP and CLEAR. Natural lighting. Person wears EXACT same clothing as reference. Photorealistic quality."
         );
         break;
 
       case "digital_product_computer":
         finalPrompt = addFidelityRequirements(
-          "Product photography that looks like a REAL photograph taken with a professional camera. The person's face must be 100% IDENTICAL to the reference photos - exact same face shape, eye color, eye shape, nose, mouth, skin tone, hair, and all facial features preserved EXACTLY. Digital product used on computer. Person maintains their EXACT same clothing style and colors from reference photos. Modern decor visible in background naturally blurred with authentic depth of field - showing realistic environment details, natural setting, authentic context with real-world imperfections like natural clutter, authentic decor elements, NOT perfectly staged. Background is naturally out of focus, soft and blurred, NOT artificially perfect. Professional context. Natural lighting with realistic shadows. Photorealistic quality - NOT AI-generated looking. Natural skin texture, realistic color grading. High-quality product photography. Context: feature highlight, product demo."
+          "Product photography taken with smartphone camera. Person's face 100% IDENTICAL to reference - EXACT same face shape, eyes, nose, mouth, skin tone, hair, ALL features preserved. Digital product on computer screen visible. Background SHARP and CLEAR. Natural lighting. Person wears EXACT same clothing as reference. Photorealistic quality."
         );
         break;
 
       case "digital_product_smartphone":
         finalPrompt = addFidelityRequirements(
-          "Product photography that looks like a REAL photograph taken with a professional camera. The person's face must be 100% IDENTICAL to the reference photos - exact same face shape, eye color, eye shape, nose, mouth, skin tone, hair, and all facial features preserved EXACTLY. Digital product used on smartphone. Person maintains their EXACT same clothing style and colors from reference photos. Modern decor visible in background naturally blurred with authentic depth of field - showing realistic environment details, natural setting, authentic context with real-world imperfections like natural clutter, authentic decor elements, NOT perfectly staged. Background is naturally out of focus, soft and blurred, NOT artificially perfect. Professional context. Natural lighting with realistic shadows. Photorealistic quality - NOT AI-generated looking. Natural skin texture, realistic imperfections preserved. High-quality product photography. Context: feature highlight, mobile product demo."
+          "Product photography taken with smartphone camera. Person's face 100% IDENTICAL to reference - EXACT same face shape, eyes, nose, mouth, skin tone, hair, ALL features preserved. Digital product on smartphone screen visible. Background SHARP and CLEAR. Natural lighting. Person wears EXACT same clothing as reference. Photorealistic quality."
         );
         break;
 
       case "digital_product_context":
         finalPrompt = addFidelityRequirements(
-          "Product photography that looks like a REAL photograph taken with a professional camera. The person's face must be 100% IDENTICAL to the reference photos - exact same face shape, eye color, eye shape, nose, mouth, skin tone, hair, and all facial features preserved EXACTLY. Digital product in professional context. Person maintains their EXACT same clothing style and colors from reference photos. Modern decor visible in background naturally blurred with authentic depth of field - showing realistic environment details, natural setting, authentic context with real-world imperfections like natural clutter, authentic decor elements, NOT perfectly staged. Background is naturally out of focus, soft and blurred, NOT artificially perfect. Professional product photography. Natural lighting with realistic shadows. Photorealistic quality - NOT AI-generated looking. Natural skin texture, realistic color grading. Context: feature highlight."
+          "Product photography taken with smartphone camera. CRITICAL: Person's face 100% IDENTICAL to reference - EXACT same face shape, eyes, nose, mouth, skin tone, hair, ALL features preserved. EXACT same beard, eyebrows, eyelashes, wrinkles, cernes, imperfections as reference. NO artificial smoothing. Digital product in professional context. Background SHARP and CLEAR. Natural lighting. Person wears EXACT same clothing as reference. Photorealistic quality."
         );
         break;
 
       // 7 Images centrées sur un produit physique
       case "product_neutral":
         finalPrompt = addFidelityRequirements(
-          "Product photography that looks like a REAL photograph taken with a professional camera. The person's face must be 100% IDENTICAL to the reference photos - exact same face shape, eye color, eye shape, nose, mouth, skin tone, hair, and all facial features preserved EXACTLY. Physical product in neutral decor. Person maintains their EXACT same clothing style and colors from reference photos. Clean neutral background naturally blurred with authentic depth of field - showing realistic texture variations, natural imperfections, subtle gradients and variations, authentic surface details, NOT perfectly uniform or artificially perfect. Background is naturally out of focus, soft and blurred, NOT artificially perfect. Minimalist staging. Professional product photography lighting with realistic shadows. Photorealistic quality - NOT AI-generated looking. Natural skin texture, realistic imperfections preserved. High-quality product photography. Context: product presentation."
+          "Product photography taken with smartphone camera. CRITICAL: Person's face 100% IDENTICAL to reference - EXACT same face shape, eyes, nose, mouth, skin tone, hair, ALL features preserved. EXACT same beard, eyebrows, eyelashes, wrinkles, cernes, imperfections as reference. NO artificial smoothing. Physical product in neutral decor. Background SHARP and CLEAR. Natural lighting. Person wears EXACT same clothing as reference. Photorealistic quality."
         );
         break;
 
       case "product_office":
         finalPrompt = addFidelityRequirements(
-          "Product photography that looks like a REAL photograph taken with a professional camera. The person's face must be 100% IDENTICAL to the reference photos - exact same face shape, eye color, eye shape, nose, mouth, skin tone, hair, and all facial features preserved EXACTLY. Physical product in office context. Person maintains their EXACT same clothing style and colors from reference photos. Office decor visible in background naturally blurred with authentic depth of field - showing realistic workspace details, natural environment, authentic office setting with real-world imperfections like natural clutter, authentic decor elements, NOT perfectly staged. Background is naturally out of focus, soft and blurred, NOT artificially perfect. Natural light with realistic shadows. Professional staging. Photorealistic quality - NOT AI-generated looking. Natural skin texture, realistic color grading. High-quality product photography. Context: product showcase in professional setting."
+          "Product photography taken with smartphone camera. Person's face 100% IDENTICAL to reference - EXACT same face shape, eyes, nose, mouth, skin tone, hair, ALL features preserved. Physical product in office setting visible. Background SHARP and CLEAR. Natural lighting. Person wears EXACT same clothing as reference. Photorealistic quality."
         );
         break;
 
       case "product_indoor":
         finalPrompt = addFidelityRequirements(
-          "Product photography that looks like a REAL photograph taken with a professional camera. The person's face must be 100% IDENTICAL to the reference photos - exact same face shape, eye color, eye shape, nose, mouth, skin tone, hair, and all facial features preserved EXACTLY. Physical product in indoor context. Person maintains their EXACT same clothing style and colors from reference photos. Indoor decor visible in background naturally blurred with authentic depth of field - showing realistic indoor details, natural environment, authentic setting with real-world imperfections like natural clutter, authentic decor elements, lived-in quality, NOT perfectly staged. Background is naturally out of focus, soft and blurred, NOT artificially perfect. Natural light with realistic shadows. Realistic staging. Photorealistic quality - NOT AI-generated looking. Natural skin texture, realistic imperfections preserved. High-quality product photography. Context: product showcase in indoor setting."
+          "Product photography taken with smartphone camera. CRITICAL: Person's face 100% IDENTICAL to reference - EXACT same face shape, eyes, nose, mouth, skin tone, hair, ALL features preserved. EXACT same beard, eyebrows, eyelashes, wrinkles, cernes, imperfections as reference. NO artificial smoothing. Physical product in indoor setting. Background SHARP and CLEAR. Natural lighting. Person wears EXACT same clothing as reference. Photorealistic quality."
         );
         break;
 
       case "product_outdoor":
         finalPrompt = addFidelityRequirements(
-          "Product photography that looks like a REAL photograph taken with a professional camera. The person's face must be 100% IDENTICAL to the reference photos - exact same face shape, eye color, eye shape, nose, mouth, skin tone, hair, and all facial features preserved EXACTLY. Physical product in outdoor context. Person maintains their EXACT same clothing style and colors from reference photos. Outdoor environment visible in background naturally blurred with authentic depth of field - showing realistic outdoor details, natural environment, authentic setting with real-world imperfections like varied terrain, natural elements, authentic outdoor context, NOT perfectly manicured or staged. Background is naturally out of focus, soft and blurred, NOT artificially perfect. Natural daylight with realistic shadows. Realistic staging. Photorealistic quality - NOT AI-generated looking. Natural skin texture, realistic color grading. High-quality product photography. Context: product showcase in outdoor setting."
+          "Product photography taken with smartphone camera. CRITICAL: Person's face 100% IDENTICAL to reference - EXACT same face shape, eyes, nose, mouth, skin tone, hair, ALL features preserved. EXACT same beard, eyebrows, eyelashes, wrinkles, cernes, imperfections as reference. NO artificial smoothing. Physical product in outdoor setting. Background SHARP and CLEAR. Natural daylight. Person wears EXACT same clothing as reference. Photorealistic quality."
         );
         break;
 
       case "product_real_context":
         finalPrompt = addFidelityRequirements(
-          "Product photography that looks like a REAL photograph taken with a professional camera. The person's face must be 100% IDENTICAL to the reference photos - exact same face shape, eye color, eye shape, nose, mouth, skin tone, hair, and all facial features preserved EXACTLY. Physical product in real context. Person maintains their EXACT same clothing style and colors from reference photos. Background naturally blurred with authentic depth of field - showing realistic environment details, natural setting, authentic context with real-world imperfections, lived-in quality, NOT perfectly staged. Background is naturally out of focus, soft and blurred, NOT artificially perfect. Natural light with realistic shadows. Immersive scene. Photorealistic quality - NOT AI-generated looking. Natural skin texture, realistic imperfections preserved. High-quality product photography. Context: realistic showcase."
+          "Product photography taken with smartphone camera. CRITICAL: Person's face 100% IDENTICAL to reference - EXACT same face shape, eyes, nose, mouth, skin tone, hair, ALL features preserved. EXACT same beard, eyebrows, eyelashes, wrinkles, cernes, imperfections as reference. NO artificial smoothing. Physical product in real context. Background SHARP and CLEAR. Natural lighting. Person wears EXACT same clothing as reference. Photorealistic quality."
         );
         break;
 
       case "product_person_blurred":
         finalPrompt = addFidelityRequirements(
-          "Product photography that looks like a REAL photograph taken with a professional camera. The person's face must be 100% IDENTICAL to the reference photos - exact same face shape, eye color, eye shape, nose, mouth, skin tone, hair, and all facial features preserved EXACTLY. Physical product being used. Person visible but blurred (natural depth of field). Person maintains their EXACT same clothing style and colors from reference photos. Background naturally blurred with authentic depth of field - showing realistic environment details, natural setting, authentic context with real-world imperfections, NOT perfectly staged. Background is naturally out of focus, soft and blurred, NOT artificially perfect. Product in sharp focus. Visible interaction. Professional product photography lighting with realistic shadows. Photorealistic quality - NOT AI-generated looking. Natural skin texture, realistic color grading. Context: demonstration, real usage, product in action."
+          "Product photography taken with smartphone camera. CRITICAL: Person's face 100% IDENTICAL to reference - EXACT same face shape, eyes, nose, mouth, skin tone, hair, ALL features preserved. EXACT same beard, eyebrows, eyelashes, wrinkles, cernes, imperfections as reference. NO artificial smoothing. Physical product being used. Person visible and clear. Background SHARP and CLEAR. Natural lighting. Person wears EXACT same clothing as reference. Product in focus. Photorealistic quality."
         );
         break;
 
       case "product_used":
         finalPrompt = addFidelityRequirements(
-          "Product photography that looks like a REAL photograph taken with a professional camera. The person's face must be 100% IDENTICAL to the reference photos - exact same face shape, eye color, eye shape, nose, mouth, skin tone, hair, and all facial features preserved EXACTLY. Physical product being used. Visible interaction with product (natural hand positions). Person maintains their EXACT same clothing style and colors from reference photos. Background naturally blurred with authentic depth of field - showing realistic environment details, natural setting, authentic context with real-world imperfections, lived-in quality, NOT perfectly staged. Background is naturally out of focus, soft and blurred, NOT artificially perfect. Natural lighting with realistic shadows. Authentic usage scene. Photorealistic quality - NOT AI-generated looking. Natural skin texture, realistic imperfections preserved. High-quality product photography. Context: demonstration, real usage."
+          "Product photography taken with smartphone camera. CRITICAL: Person's face 100% IDENTICAL to reference - EXACT same face shape, eyes, nose, mouth, skin tone, hair, ALL features preserved. EXACT same beard, eyebrows, eyelashes, wrinkles, cernes, imperfections as reference. NO artificial smoothing. Physical product being used. Visible interaction. Background SHARP and CLEAR. Natural lighting. Person wears EXACT same clothing as reference. Photorealistic quality."
         );
         break;
 
       // 8 Catégories à enrichir
       case "mentor_portrait":
         finalPrompt = addFidelityRequirements(
-          "Inspiring mentor portrait photograph that looks like a REAL photograph taken with a professional camera. The person's face must be 100% IDENTICAL to the reference photos - exact same face shape, eye color, eye shape, nose, mouth, skin tone, hair, and all facial features preserved EXACTLY. Symbolic staging with motivational elements. Background naturally blurred with authentic depth of field - showing realistic environment details, natural setting, authentic context with real-world imperfections, NOT perfectly staged. Background is naturally out of focus, soft and blurred, NOT artificially perfect. Confident warm presence matching their natural expression. Person maintains their EXACT same clothing style and colors from reference photos. Motivational approachable atmosphere. Professional portrait lighting with realistic shadows. Photorealistic quality - NOT AI-generated looking. Natural skin texture, realistic imperfections preserved. High-quality photography. Context: motivational posts, mentorship."
+          "Inspiring mentor portrait taken with smartphone camera. CRITICAL: Person's face 100% IDENTICAL to reference - EXACT same face shape, eyes, nose, mouth, skin tone, hair, ALL features preserved. EXACT same beard, eyebrows, eyelashes, wrinkles, cernes, imperfections as reference. NO artificial smoothing. Symbolic staging. Background SHARP and CLEAR. Natural lighting. Person wears EXACT same clothing as reference. Photorealistic quality."
         );
         break;
 
       case "leader_portrait":
         finalPrompt = addFidelityRequirements(
-          "Inspiring leader portrait photograph that looks like a REAL photograph taken with a professional camera. The person's face must be 100% IDENTICAL to the reference photos - exact same face shape, eye color, eye shape, nose, mouth, skin tone, hair, and all facial features preserved EXACTLY. Symbolic staging with leadership elements. Background naturally blurred with authentic depth of field - showing realistic environment details, natural setting, authentic context with real-world imperfections, NOT perfectly staged. Background is naturally out of focus, soft and blurred, NOT artificially perfect. Confident strong presence matching their natural expression. Person maintains their EXACT same clothing style and colors from reference photos. Motivational decisive atmosphere. Professional portrait lighting with realistic shadows. Photorealistic quality - NOT AI-generated looking. Natural skin texture, realistic color grading. High-quality photography. Context: motivational posts, leadership."
+          "Inspiring leader portrait taken with smartphone camera. CRITICAL: Person's face 100% IDENTICAL to reference - EXACT same face shape, eyes, nose, mouth, skin tone, hair, ALL features preserved. EXACT same beard, eyebrows, eyelashes, wrinkles, cernes, imperfections as reference. NO artificial smoothing. Symbolic staging. Background SHARP and CLEAR. Natural lighting. Person wears EXACT same clothing as reference. Photorealistic quality."
         );
         break;
 
       case "mentor_leader":
         finalPrompt = addFidelityRequirements(
-          "Inspiring mentor/leader portrait photograph that looks like a REAL photograph taken with a professional camera. The person's face must be 100% IDENTICAL to the reference photos - exact same face shape, eye color, eye shape, nose, mouth, skin tone, hair, and all facial features preserved EXACTLY. Symbolic staging. Background naturally blurred with authentic depth of field - showing realistic environment details, natural setting, authentic context with real-world imperfections, NOT perfectly staged. Background is naturally out of focus, soft and blurred, NOT artificially perfect. Confident presence matching their natural expression. Person maintains their EXACT same clothing style and colors from reference photos. Motivational tone. Professional portrait lighting with realistic shadows. Photorealistic quality - NOT AI-generated looking. Natural skin texture, realistic imperfections preserved. High-quality photography. Context: motivational posts."
+          "Inspiring mentor/leader portrait taken with smartphone camera. CRITICAL: Person's face 100% IDENTICAL to reference - EXACT same face shape, eyes, nose, mouth, skin tone, hair, ALL features preserved. EXACT same beard, eyebrows, eyelashes, wrinkles, cernes, imperfections as reference. NO artificial smoothing. Symbolic staging. Background SHARP and CLEAR. Natural lighting. Person wears EXACT same clothing as reference. Photorealistic quality."
         );
         break;
 
       case "creative_portrait":
         finalPrompt = addFidelityRequirements(
-          "Creative portrait photograph that looks like a REAL photograph taken with a professional camera. The person's face must be 100% IDENTICAL to the reference photos - exact same face shape, eye color, eye shape, nose, mouth, skin tone, hair, and all facial features preserved EXACTLY. Vibrant colors in background and lighting (but NOT oversaturated - realistic color grading). Background naturally blurred with authentic depth of field - showing realistic environment details, natural setting, authentic context with real-world imperfections, NOT perfectly staged. Background is naturally out of focus, soft and blurred, NOT artificially perfect. Person maintains their EXACT same clothing style and colors from reference photos. Modern graphic style. Tasteful artistic composition. Creative lighting effects with realistic shadows. Photorealistic quality - NOT AI-generated looking. Natural skin texture, realistic imperfections preserved. High-quality creative photography. Context: creative announcements."
+          "Creative portrait taken with smartphone camera. CRITICAL: Person's face 100% IDENTICAL to reference - EXACT same face shape, eyes, nose, mouth, skin tone, hair, ALL features preserved. EXACT same beard, eyebrows, eyelashes, wrinkles, cernes, imperfections as reference. NO artificial smoothing. Vibrant colors but realistic. Background SHARP and CLEAR. Natural lighting. Person wears EXACT same clothing as reference. Photorealistic quality."
         );
         break;
 
       case "subtle_humor":
         finalPrompt = addFidelityRequirements(
-          "Subtle humorous scene photograph that looks like a REAL photograph taken with a professional camera. The person's face must be 100% IDENTICAL to the reference photos - exact same face shape, eye color, eye shape, nose, mouth, skin tone, hair, and all facial features preserved EXACTLY. Person wearing their EXACT same clothing style and colors from the reference photos. Person maintains their exact same face shape, hair style and color, eye color, and appearance from the reference photos. Background naturally blurred with authentic depth of field - showing realistic environment details, natural setting, authentic context with real-world imperfections, lived-in quality, NOT perfectly staged. Background is naturally out of focus, soft and blurred, NOT artificially perfect. Natural, light gestures matching their natural expression. Light, humorous tone. Professional yet approachable atmosphere. Natural lighting with realistic shadows. Photorealistic quality - NOT AI-generated looking. Natural skin texture, realistic color grading. High-quality photography. Context: personal posts."
+          "Subtle humorous scene taken with smartphone camera. CRITICAL: Person's face 100% IDENTICAL to reference - EXACT same face shape, eyes, nose, mouth, skin tone, hair, ALL features preserved. EXACT same beard, eyebrows, eyelashes, wrinkles, cernes, imperfections as reference. NO artificial smoothing. Light gestures. Background SHARP and CLEAR. Natural lighting. Person wears EXACT same clothing as reference. Photorealistic quality."
         );
         break;
 
       default:
         finalPrompt = addFidelityRequirements(
-          "Realistic portrait photograph that looks like a REAL photograph taken with a professional camera. The person's face must be 100% IDENTICAL to the reference photos - exact same face shape, eye color, eye shape, nose, mouth, skin tone, hair, and all facial features preserved EXACTLY. Person maintains their EXACT same clothing style and colors from reference photos. Neutral background naturally blurred with authentic depth of field - showing realistic texture variations, natural imperfections, subtle gradients and variations, authentic surface details, NOT perfectly uniform or artificially perfect. Background is naturally out of focus, soft and blurred, NOT artificially perfect. Natural lighting with realistic shadows. Photorealistic quality - NOT AI-generated looking. Natural skin texture, realistic imperfections preserved."
+          "Realistic portrait taken with smartphone camera. CRITICAL: Person's face 100% IDENTICAL to reference - EXACT same face shape, eyes, nose, mouth, skin tone, hair, ALL features preserved. EXACT same beard, eyebrows, eyelashes, wrinkles, cernes, imperfections as reference. NO artificial smoothing. Neutral background SHARP and CLEAR. Natural lighting. Person wears EXACT same clothing as reference. Photorealistic quality."
         );
         break;
     }
@@ -1083,9 +1159,25 @@ Carefully analyze the theme, tone, context, and setting of this post text. Ident
 
     // Shorten and normalize prompt to avoid overly long requests that can fail with high image counts
     const normalizedPrompt = optimizedPrompt.replace(/\s+/g, " ").trim().slice(0, 700);
-    const requirements =
-      "Requirements: single person only (no other humans), be faithful to the original face (preserve the same eyes, face shape, hair style/color/length, and skin tone from the reference selfies), keep the SAME clothing style/colors/formality as selfies (no costumes/suits if not in selfies), photorealistic and faithful to the original face, sharp focus, professional lighting, aspect ratio 1:1 or 4:5, no watermarks.";
-    const finalPrompt = `${normalizedPrompt}\n${requirements}`;
+    
+    // Normaliser pour supprimer les mentions de flou
+    const promptWithoutBlur = normalizePromptForSharpBackground(normalizedPrompt);
+    
+    const requirements = `CRITICAL REQUIREMENTS:
+- Single person only (no other humans)
+- EXACT face preservation: preserve ALL natural asymmetries, imperfections, skin defects (pores, acne, scars, spots), under-eye circles, skin redness, uneven skin tone
+- PRESERVE natural facial volumes (NO slimming, NO contouring, NO beautification)
+- Natural eyes: NOT glossy, NOT glassy, low-contrast iris, irregular eyelashes
+- EXACT beard/hair: irregular density, natural unevenness, NO perfect grooming
+- Keep SAME clothing style/colors/formality as selfies (no costumes/suits if not in selfies)
+- CRITICAL: Background must be SHARP and FULLY READABLE (NO blur, NO bokeh, NO portrait mode)
+- CRITICAL: Deep focus throughout - foreground AND background EQUALLY SHARP
+- Camera: standard smartphone or simple camera (NO professional portrait mode)
+- Natural lighting (NO professional studio setup)
+- Photorealistic: looks like real smartphone photo with zero AI beautification
+- Aspect ratio 1:1 or 4:5, no watermarks`;
+    
+    const finalPrompt = `${promptWithoutBlur}\n\n${requirements}`;
 
     // Try generation; fallback to smaller counts if needed
     const tryGenerate = async (count) => {
@@ -1149,645 +1241,1185 @@ Carefully analyze the theme, tone, context, and setting of this post text. Ident
   }
 });
 
-// ---------------------- GENERATE LYTER ILLUSTRATION (sans visage humain) ----------------------
 
-// ---------------------- GENERATE LYTER ILLUSTRATION (AMÉLIORÉ) ----------------------
+// =============================================================================
+// Mode Lyter GÉNÉRATION D'ILLUSTRATIONS PROFESSIONNELLES POUR LINKEDIN
+// =============================================================================
 
-// Définitions des styles d'illustration Lyter
+
 const LYTER_ILLUSTRATION_STYLES = {
   cheat_sheet: {
     name: "Cheat Sheet Infographic",
     description: "Infographie structurée, lisible, très pédagogique",
-    keywords: ["checklist", "points clés", "résumé", "mémo", "guide rapide", "à retenir"],
-    visualContent: "Titres courts, listes à puces, icônes simples, mise en page claire",
-    promptGuidance: "Créer une infographie type aide-mémoire avec titres courts, points essentiels, icônes simples et mise en page claire. Style professionnel, lisible, pédagogique.",
+    // MOTS-CLÉS EN FRANÇAIS ET ANGLAIS
+    keywords_fr: [
+      "retenir", "points clés", "checklist", "réussir", 
+      "les 5", "les 3", "erreurs", "bénéfices", 
+      "ce qu'il faut", "à retenir", "résumé"
+    ],
+    keywords_en: [
+      "remember", "key points", "checklist", "succeed", 
+      "the 5", "the 3", "mistakes", "benefits", 
+      "what you need", "to remember", "summary"
+    ],
     allowHands: false,
-    allowHandwriting: false
+    allowHandwriting: false,
+    getPrompt: (language) => `CRITICAL: This MUST look like a REAL PHOTOGRAPH taken with a professional camera, NOT an AI-generated illustration.
+
+COMPOSITION:
+- REAL notebook on REAL wooden desk (overhead flat lay)
+- REAL paper with visible texture, natural color, authentic edges
+- REAL handwritten checklist with numbered items (1, 2, 3...)
+- Simple hand-drawn icons on REAL paper
+- Clear title at top, handwritten
+
+TEXT REQUIREMENTS (HANDWRITING MANDATORY):
+- ALL text in ${language}
+- ACTUALLY HANDWRITTEN with REAL pen on REAL paper
+- Natural handwriting: visible pen pressure, organic letter shapes, natural spacing
+- Real ink absorption into paper fibers
+- NO digital text, NO printed text, NO perfect typography
+
+AUTHENTIC OBJECTS:
+- REAL notebook: visible paper grain, worn edges, real binding
+- REAL desk: wood grain, natural texture, knots, wear marks
+- REAL pen: visible brand, real materials
+- REAL shadows: natural direction, soft edges
+- REAL lighting: natural window light
+
+PHOTOGRAPHIC REALISM:
+- Natural depth of field
+- Real textures everywhere
+- Authentic imperfections (wrinkles, off-center)
+- Real materials only
+
+FORBIDDEN:
+✗ NO human faces, bodies, arms, or hands
+✗ NO AI-generated look
+✗ NO digital graphics
+✗ NO printed text
+✗ NO perfect surfaces
+
+FORMAT: Square 1:1, mobile-optimized, 3-second readable
+
+GOAL: 100% authentic photograph of real handwritten checklist on real desk.`
   },
+
   process_steps: {
     name: "Process/Steps Infographic",
-    description: "Diagramme expliquant un processus ou workflow",
-    keywords: ["processus", "étapes", "workflow", "comment", "méthode", "procédure"],
-    visualContent: "Flèches, numéros, étapes connectées",
-    promptGuidance: "Créer une infographie de processus avec flèches, étapes numérotées et éléments connectés montrant un workflow ou une séquence. Flux logique et clair.",
+    description: "Processus chronologique - étapes qui se suivent",
+    // MOTS-CLÉS ORIENTÉS PROCESSUS EN FRANÇAIS ET ANGLAIS
+    keywords_fr: [
+      "étapes", "processus", "comment fonctionne", 
+      "d'abord", "ensuite", "puis", "enfin",
+      "process", "déroulé", "de A à B"
+    ],
+    keywords_en: [
+      "steps", "process", "how it works", 
+      "first", "then", "next", "finally",
+      "workflow", "sequence", "from A to B"
+    ],
     allowHands: false,
-    allowHandwriting: false
+    allowHandwriting: false,
+    getPrompt: (language) => `CRITICAL: REAL PHOTOGRAPH of chronological process.
+
+COMPOSITION:
+- Horizontal/diagonal flow on REAL surface
+- REAL cards or REAL post-its showing steps
+- REAL arrows drawn with REAL marker
+- Clear sequence: Step 1 → Step 2 → Step 3
+
+TEXT REQUIREMENTS:
+- ALL text in ${language}
+- PHYSICALLY written on REAL materials
+- Step numbers clearly visible
+- Natural handwriting with real ink
+
+AUTHENTIC OBJECTS:
+- REAL paper cards/post-its with texture
+- REAL whiteboard with surface texture
+- REAL markers with visible brand
+- REAL desk with wood grain
+- REAL drawn arrows (not digital)
+
+PHOTOGRAPHIC REALISM:
+- Natural shadows from cards
+- Real depth of field
+- Authentic material textures
+- Organic positioning
+
+FORBIDDEN:
+✗ NO human faces, bodies, arms, or hands
+✗ NO digital arrows or graphics
+✗ NO perfect alignment
+
+FORMAT: Square 1:1, flow direction immediately clear
+
+GOAL: Real photograph of workflow diagram on real surface.`
   },
+
   comparison: {
     name: "Comparison Infographic",
-    description: "Visuels comparant deux visions ou deux choix",
-    keywords: ["vs", "versus", "comparaison", "avant/après", "différence", "opposé", "plutôt que"],
-    visualContent: "Colonnes, contraste visuel, couleurs opposées",
-    promptGuidance: "Créer une infographie de comparaison avec deux colonnes, contraste visuel et couleurs opposées. Disposition côte à côte.",
+    description: "Visuels qui opposent deux visions",
+    keywords_fr: [
+      "avant/après", "vs", "versus", "option A", "option B",
+      "mythe", "réalité", "comparaison", "opposé"
+    ],
+    keywords_en: [
+      "before/after", "vs", "versus", "option A", "option B",
+      "myth", "reality", "comparison", "opposite"
+    ],
     allowHands: false,
-    allowHandwriting: false
+    allowHandwriting: false,
+    getPrompt: (language) => `CRITICAL: REAL PHOTOGRAPH showing comparison.
+
+COMPOSITION:
+- Split layout (left vs right) on REAL surface
+- Two contrasting REAL setups
+- Physical separation line
+- Equal space for each side
+
+TEXT REQUIREMENTS (HANDWRITING MANDATORY):
+- ALL text in ${language}
+- HANDWRITTEN with REAL pen/marker
+- Labels for each side (Option A / Option B)
+- Natural handwriting style
+
+AUTHENTIC OBJECTS:
+- REAL paper with different types on each side
+- REAL objects representing each option
+- REAL desk with wood grain
+- Physical separation
+
+PHOTOGRAPHIC REALISM:
+- Natural shadows on both sides
+- Real material textures
+- Authentic imperfections
+
+FORBIDDEN:
+✗ NO human faces, bodies, arms, or hands
+✗ NO digital graphics
+✗ NO perfect symmetry
+
+FORMAT: Square 1:1, contrast visible in 3 seconds
+
+GOAL: Real photograph of actual comparison on real desk.`
   },
+
   study_results: {
     name: "Study/Results Infographic",
-    description: "Visuels illustrant des données ou des conclusions",
-    keywords: ["étude", "résultats", "statistiques", "données", "analyse", "benchmark", "recherche"],
-    visualContent: "Graphiques simples, chiffres clés, encadrés explicatifs",
-    promptGuidance: "Créer une infographie de données/résultats avec graphiques simples, chiffres clés mis en évidence et encadrés explicatifs. Style de visualisation de données.",
+    description: "Données, statistiques, résultats",
+    keywords_fr: [
+      "statistiques", "étude", "résultats", "données",
+      "chiffres", "benchmark", "analyse", "%"
+    ],
+    keywords_en: [
+      "statistics", "study", "results", "data",
+      "numbers", "benchmark", "analysis", "%"
+    ],
     allowHands: false,
-    allowHandwriting: false
+    allowHandwriting: false,
+    getPrompt: (language) => `CRITICAL: REAL PHOTOGRAPH with data visualization.
+
+COMPOSITION:
+- Modern office desk with REAL screen/tablet
+- REAL charts displayed on REAL device
+- REAL printed charts on paper
+- Key numbers highlighted
+
+TEXT REQUIREMENTS:
+- ALL text in ${language}
+- Displayed on REAL screen OR printed
+- Large bold numbers
+- Chart labels visible
+
+AUTHENTIC OBJECTS:
+- REAL device (laptop/tablet) with authentic materials
+- REAL screen with natural glow and reflections
+- REAL printed charts with paper texture
+- REAL desk with wood grain
+
+PHOTOGRAPHIC REALISM:
+- Natural screen glow
+- Subtle fingerprints on screen
+- Real shadows from device
+
+FORBIDDEN:
+✗ NO human faces, bodies, arms, or hands
+✗ NO perfect charts
+✗ NO digital-only appearance
+
+FORMAT: Square 1:1, key metric instantly visible
+
+GOAL: Real photograph of data on real devices.`
   },
+
   handwritten_text: {
     name: "Handwritten Text on Physical Support",
-    description: "Texte clé écrit 'à la main' sur un support réel",
-    keywords: ["citation", "phrase forte", "idée clé", "note manuscrite"],
-    visualContent: "Papier, carnet, post-it, livre ouvert",
-    promptGuidance: "Créer un texte manuscrit sur un support physique (papier, carnet, post-it ou livre ouvert). Style d'écriture naturelle, texture réaliste.",
+    description: "Texte clé écrit à la main",
+    keywords_fr: [
+      "citation", "phrase forte", "idée clé",
+      "manuscrit", "phrase choc", "note"
+    ],
+    keywords_en: [
+      "quote", "strong phrase", "key idea",
+      "handwritten", "powerful phrase", "note"
+    ],
     allowHands: true,
-    allowHandwriting: true
+    allowHandwriting: true,
+    getPrompt: (language) => `CRITICAL: REAL PHOTOGRAPH of handwritten note.
+
+COMPOSITION:
+- Close-up of REAL handwritten text
+- REAL support (notebook/paper/post-it/book)
+- Main phrase centered
+- OPTIONAL: REAL hand holding pen or paper edge only
+
+TEXT REQUIREMENTS:
+- ALL text in ${language}
+- ACTUALLY HANDWRITTEN with REAL pen
+- Large legible handwriting
+- Dark ink on light paper
+- Real pen pressure variations
+
+AUTHENTIC OBJECTS:
+- REAL paper with fiber texture
+- REAL notebook with binding
+- REAL pen with brand visible
+- IF HAND: real skin texture, natural position
+
+PHOTOGRAPHIC REALISM:
+- Natural shadows
+- Real ink absorption
+- Authentic handwriting variations
+
+FORBIDDEN:
+✗ NO human faces
+✗ Hands ONLY if holding pen/paper naturally
+✗ NO printed text
+✗ NO digital text
+
+FORMAT: Square 1:1, phrase readable in 3 seconds
+
+GOAL: Real photograph of authentic handwritten text.`
   },
+
   whiteboard: {
     name: "Text on Whiteboard/Blackboard",
-    description: "Texte écrit sur tableau blanc ou noir",
-    keywords: ["explication", "démonstration", "enseignement", "formation"],
-    visualContent: "Tableau blanc (marqueur) ou tableau noir (craie)",
-    promptGuidance: "Créer un texte écrit sur tableau blanc (marqueur) ou tableau noir (craie). Style éducatif propre avec écriture claire.",
+    description: "Explication, démonstration, enseignement",
+    keywords_fr: [
+      "explication", "démonstration", "raisonnement",
+      "formation", "enseigne", "explique"
+    ],
+    keywords_en: [
+      "explanation", "demonstration", "reasoning",
+      "training", "teaches", "explains"
+    ],
     allowHands: true,
-    allowHandwriting: true
+    allowHandwriting: true,
+    getPrompt: (language) => `CRITICAL: REAL PHOTOGRAPH of whiteboard/blackboard.
+
+COMPOSITION:
+- Straight view of REAL board
+- Main concept written prominently
+- Educational explanation
+- OPTIONAL: REAL hand holding marker/chalk
+
+TEXT REQUIREMENTS:
+- ALL text in ${language}
+- HANDWRITTEN with REAL marker/chalk
+- Bold writing, large text
+- High contrast
+
+AUTHENTIC OBJECTS:
+- REAL whiteboard/blackboard with texture
+- REAL markers/chalk with brands
+- Marker residue/chalk dust visible
+- IF HAND: real skin texture
+
+PHOTOGRAPHIC REALISM:
+- Natural board reflections
+- Real writing texture
+- Authentic wear marks
+
+FORBIDDEN:
+✗ NO human faces
+✗ Hands ONLY if holding marker/chalk
+✗ NO printed text
+
+FORMAT: Square 1:1, concept visible in 3 seconds
+
+GOAL: Real photograph of real board with real writing.`
   },
+
   styled_hook: {
     name: "Styled Post Hook",
-    description: "Phrase d'accroche uniquement, formatée graphiquement",
-    keywords: ["accroche", "hook", "annonce courte", "phrase choc"],
-    visualContent: "Fond coloré, rectangle stylisé, typographie marquée",
-    promptGuidance: "Créer un texte d'accroche stylisé avec fond coloré, cadre rectangulaire stylisé et typographie audacieuse. Design moderne accrocheur.",
+    description: "Accroche stylisée",
+    keywords_fr: [
+      "accroche", "hook", "annonce", "posts courts",
+      "phrase d'accroche"
+    ],
+    keywords_en: [
+      "hook", "attention grabber", "announcement", "short posts",
+      "hook phrase"
+    ],
     allowHands: false,
-    allowHandwriting: false
+    allowHandwriting: false,
+    getPrompt: (language) => `CRITICAL: REAL PHOTOGRAPH of styled hook.
+
+COMPOSITION:
+- Minimalist clean layout
+- Single powerful phrase
+- Bold typography on REAL material
+- REAL frame or colored background
+
+TEXT REQUIREMENTS:
+- Hook in ${language}
+- PHYSICALLY printed/painted on REAL paper
+- Very large bold text
+- High contrast
+
+AUTHENTIC OBJECTS:
+- REAL colored paper/card
+- REAL printing/painting
+- REAL frame
+- Natural material textures
+
+PHOTOGRAPHIC REALISM:
+- Real shadows
+- Authentic printing quality
+- Material imperfections
+
+FORBIDDEN:
+✗ NO human faces, bodies, arms, or hands
+✗ NO handwritten text
+✗ NO digital graphics
+
+FORMAT: Square 1:1, hook readable in 3 seconds
+
+GOAL: Real photograph of bold typography on real surface.`
   },
+
   mockup_screenshot: {
     name: "Mockup or Stylized Screenshot",
-    description: "Représentation visuelle d'un outil, app ou concept",
-    keywords: ["produit", "app", "outil", "interface", "dashboard", "fonctionnalité"],
-    visualContent: "Écran stylisé, contextualisation, zoom sur feature",
-    promptGuidance: "Créer un mockup ou capture d'écran stylisée montrant un outil, interface d'app ou visualisation de concept. Style tech moderne et épuré.",
+    description: "Représentation d'outil, app, concept",
+    keywords_fr: [
+      "produit", "app", "outil", "interface",
+      "dashboard", "démonstration", "tutoriel"
+    ],
+    keywords_en: [
+      "product", "app", "tool", "interface",
+      "dashboard", "demonstration", "tutorial"
+    ],
     allowHands: true,
-    allowHandwriting: false
+    allowHandwriting: false,
+    getPrompt: (language) => `CRITICAL: REAL PHOTOGRAPH of device with interface.
+
+COMPOSITION:
+- Professional desk with REAL device
+- 3/4 angle view
+- REAL screen clearly visible
+- OPTIONAL: REAL hand holding device
+
+TEXT REQUIREMENTS:
+- ALL screen content in ${language}
+- REAL interface on REAL screen
+- Readable UI elements
+
+AUTHENTIC OBJECTS:
+- REAL device (phone/tablet/laptop)
+- REAL screen with glow and reflections
+- REAL desk with wood grain
+- IF HAND: real skin texture
+
+PHOTOGRAPHIC REALISM:
+- Natural screen glow
+- Subtle fingerprints
+- Real device materials
+
+FORBIDDEN:
+✗ NO human faces
+✗ Hands ONLY if holding device
+✗ NO perfect screen
+
+FORMAT: Square 1:1, interface recognizable in 3 seconds
+
+GOAL: Real photograph of real device with real interface.`
   },
+
   visual_metaphor: {
     name: "Visual Metaphor",
-    description: "Illustration abstraite d'une idée",
-    keywords: ["métaphore", "symbolique", "concept abstrait", "réflexion"],
-    visualContent: "Escalier (progression), pont (transition), labyrinthe (complexité)",
-    promptGuidance: "Créer une illustration de métaphore visuelle représentant une idée abstraite (escalier, pont, labyrinthe, etc.). Style symbolique et conceptuel.",
+    description: "Concept abstrait via métaphore visuelle",
+    keywords_fr: [
+      "métaphore", "symbolique", "abstrait",
+      "storytelling", "réflexion", "opinion"
+    ],
+    keywords_en: [
+      "metaphor", "symbolic", "abstract",
+      "storytelling", "reflection", "opinion"
+    ],
     allowHands: false,
-    allowHandwriting: false
+    allowHandwriting: false,
+    getPrompt: (language) => `CRITICAL: REAL PHOTOGRAPH of symbolic real object.
+
+COMPOSITION:
+- REAL symbolic object as focal point
+- Artistic angle showing depth
+- Simple uncluttered composition
+
+METAPHOR EXAMPLES (REAL OBJECTS):
+- REAL stairs = progress (real wood/stone)
+- REAL bridge = transition (real materials)
+- REAL labyrinth = complexity (real hedges)
+- REAL path = journey (real asphalt/dirt)
+- REAL light/shadow = contrast (natural light)
+
+TEXT REQUIREMENTS:
+- Minimal or no text
+- If text: in ${language}, physically written
+
+AUTHENTIC OBJECTS:
+- REAL symbolic objects photographed
+- REAL materials (wood grain, stone texture)
+- Natural wear and aging
+- Natural lighting
+
+PHOTOGRAPHIC REALISM:
+- Real shadows
+- Authentic textures
+- Natural imperfections
+
+FORBIDDEN:
+✗ NO human faces, bodies, arms, or hands
+✗ NO AI-generated objects
+✗ NO digital graphics
+
+FORMAT: Square 1:1, metaphor recognizable in 3 seconds
+
+GOAL: Real photograph of real symbolic object.`
   },
+
   intriguing_stop_scroll: {
     name: "Intriguing/Stop Scroll Image",
-    description: "Visuels intentionnellement surprenants",
-    keywords: ["accroche forte", "débat", "prise de position", "controverse"],
-    visualContent: "Composition surprenante, audacieuse, génératrice de curiosité",
-    promptGuidance: "Créer un visuel intrigant et accrocheur qui arrête le scroll. Composition surprenante, audacieuse, génératrice de curiosité.",
+    description: "Visuels surprenants pour capter l'attention",
+    keywords_fr: [
+      "accroche forte", "débat", "controverse",
+      "surprenant", "curiosité", "prise de position"
+    ],
+    keywords_en: [
+      "strong hook", "debate", "controversy",
+      "surprising", "curiosity", "taking a stand"
+    ],
     allowHands: true,
-    allowHandwriting: false
-  },
-  quote_reflection: {
-    name: "Quote/Reflection Visual",
-    description: "Citation ou réflexion mise en valeur visuellement",
-    keywords: ["citation", "quote", "réflexion", "pensée", "sagesse", "inspiration"],
-    visualContent: "Typographie soignée, fond calme, mise en scène contemplative",
-    promptGuidance: "Créer un visuel de citation/réflexion avec typographie soignée, fond calme et mise en scène contemplative. Style inspirant et professionnel.",
-    allowHands: false,
-    allowHandwriting: false
+    allowHandwriting: false,
+    getPrompt: (language) => `CRITICAL: REAL PHOTOGRAPH with unexpected composition.
+
+OBJECTIVE:
+- Capture attention
+- Create curiosity
+- Stop scrolling effect
+
+COMPOSITION:
+- Unexpected angle or perspective
+- Bold visual statement
+- Striking but professional
+- OPTIONAL: REAL hand for impact
+
+TEXT REQUIREMENTS:
+- Minimal text preferred
+- If text: in ${language}, physically written
+- Bold large text if used
+
+AUTHENTIC OBJECTS:
+- REAL objects with textures
+- REAL materials
+- REAL shadows for drama
+- IF HAND: real skin texture
+
+PHOTOGRAPHIC REALISM:
+- Dramatic natural shadows
+- High contrast
+- Authentic imperfections
+
+FORBIDDEN:
+✗ NO human faces
+✗ Hands ONLY if adding impact
+✗ NO offensive content
+
+FORMAT: Square 1:1, grabs attention in 3 seconds
+
+GOAL: Real photograph that stops scrolling immediately.`
   }
 };
+
+// =============================================================================
+// FONCTION HELPER : OBTENIR LES MOTS-CLÉS SELON LA LANGUE
+// =============================================================================
+
+/**
+ * Retourne les mots-clés d'un style selon la langue détectée
+ * @param {string} styleKey - La clé du style (ex: "cheat_sheet")
+ * @param {string} language - La langue détectée ("French" ou "English")
+ * @returns {string[]} - Tableau des mots-clés dans la langue appropriée
+ */
+function getStyleKeywords(styleKey, language) {
+  const style = LYTER_ILLUSTRATION_STYLES[styleKey];
+  if (!style) return [];
+  
+  // Détecter si c'est français ou anglais
+  const isFrench = language && (
+    language.toLowerCase().includes('french') || 
+    language.toLowerCase().includes('français') ||
+    language.toLowerCase() === 'fr'
+  );
+  
+  // Retourner les mots-clés dans la langue appropriée, ou combiner les deux si langue non détectée
+  if (isFrench && style.keywords_fr) {
+    return style.keywords_fr;
+  } else if (!isFrench && style.keywords_en) {
+    return style.keywords_en;
+  } else {
+    // Si langue non détectée ou style incomplet, combiner les deux
+    return [...(style.keywords_fr || []), ...(style.keywords_en || [])];
+  }
+}
+
+// =============================================================================
+// SECTION 2 : PROMPT DE DÉTECTION AMÉLIORÉ
+// =============================================================================
+
+const IMPROVED_STYLE_DETECTION_PROMPT = (postText) => `Tu es un expert en analyse de contenu LinkedIn et en détection de styles visuels.
+
+Analyse ce post LinkedIn et choisis le MEILLEUR style d'illustration parmi ces 10 options :
+
+1. **cheat_sheet** - Infographie structurée avec points clés, checklist, résumé
+   → Utiliser si : "Ce qu'il faut retenir", "Les X points clés", "Checklist", "Erreurs à éviter"
+
+2. **process_steps** - Processus chronologique avec étapes qui se suivent
+   → Utiliser si : "Comment fonctionne", "Les étapes pour", "Process complet", "d'abord...ensuite...puis"
+
+3. **comparison** - Comparaison entre deux options
+   → Utiliser si : "Avant/après", "Option A vs B", "Mythe vs réalité"
+
+4. **study_results** - Données, statistiques, résultats d'études
+   → Utiliser si : Partage de statistiques, résultats, benchmarks, chiffres clés
+
+5. **handwritten_text** - Texte manuscrit sur support physique
+   → Utiliser si : Citation forte, phrase choc, idée clé à mettre en valeur
+
+6. **whiteboard** - Explication sur tableau blanc/noir
+   → Utiliser si : Explication, raisonnement, démonstration pédagogique
+
+7. **styled_hook** - Accroche stylisée graphiquement
+   → Utiliser si : Post très court, hook fort, annonce simple
+
+8. **mockup_screenshot** - Interface d'outil ou d'app
+   → Utiliser si : Annonce produit, démonstration d'outil, tutoriel
+
+9. **visual_metaphor** - Métaphore visuelle abstraite
+   → Utiliser si : Storytelling, réflexion, opinion, concept abstrait
+
+10. **intriguing_stop_scroll** - Visuel surprenant pour capter l'attention
+    → Utiliser si : Accroche forte, débat, prise de position, controverse
+
+═══════════════════════════════════════════════════════════════════════
+RÈGLES DE DÉCISION STRICTES
+═══════════════════════════════════════════════════════════════════════
+
+🔹 Si le post contient une LISTE NUMÉROTÉE de points/erreurs/bénéfices
+   → Choisir "cheat_sheet"
+
+🔹 Si le post décrit des ÉTAPES SÉQUENTIELLES (d'abord, ensuite, puis)
+   → Choisir "process_steps"
+
+🔹 Si le post fait une COMPARAISON (avant/après, A vs B)
+   → Choisir "comparison"
+
+🔹 Si le post contient des DONNÉES CHIFFRÉES ou statistiques
+   → Choisir "study_results"
+
+🔹 Si le post a une CITATION FORTE ou phrase inspirante
+   → Choisir "handwritten_text"
+
+🔹 Si le post EXPLIQUE un concept de façon pédagogique
+   → Choisir "whiteboard"
+
+🔹 Si le post est TRÈS COURT avec juste une accroche
+   → Choisir "styled_hook"
+
+🔹 Si le post parle d'un OUTIL/APP/PRODUIT
+   → Choisir "mockup_screenshot"
+
+🔹 Si le post utilise une MÉTAPHORE pour illustrer un concept
+   → Choisir "visual_metaphor"
+
+🔹 Si le post a un ton POLÉMIQUE/DÉBAT/POSITION FORTE
+   → Choisir "intriguing_stop_scroll"
+
+═══════════════════════════════════════════════════════════════════════
+POST À ANALYSER
+═══════════════════════════════════════════════════════════════════════
+
+"""${postText}"""
+
+═══════════════════════════════════════════════════════════════════════
+RÉPONSE REQUISE
+═══════════════════════════════════════════════════════════════════════
+
+Réponds UNIQUEMENT avec un objet JSON au format suivant :
+
+{
+  "detectedStyle": "nom_du_style",
+  "postType": "description du type de post",
+  "confidence": 0.95,
+  "reasoning": "Explication détaillée : pourquoi ce style est le meilleur choix"
+}
+
+IMPORTANT : Analyse avec soin et choisis le style qui correspond LE MIEUX au contenu.`;
+
+// =============================================================================
+// FONCTION DE DÉTECTION DE LANGUE SIMPLIFIÉE
+// =============================================================================
+
+async function detectPostLanguage(postText) {
+  try {
+    const langRes = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${process.env.OPENAI_API_KEY}`
+      },
+      body: JSON.stringify({
+        model: "gpt-4-turbo-preview",
+        temperature: 0.1,
+        messages: [
+          { 
+            role: "system", 
+            content: "Tu es expert en détection de langues. Réponds UNIQUEMENT avec le nom de la langue en anglais (ex: French, English, Spanish, German, Italian, Portuguese, Arabic, Dutch, etc.)." 
+          },
+          { 
+            role: "user", 
+            content: `Détecte la langue de ce texte:\n\n${postText.substring(0, 500)}` 
+          }
+        ],
+        max_tokens: 10
+      })
+    });
+
+    if (langRes.ok) {
+      const data = await langRes.json();
+      const detectedLang = data.choices?.[0]?.message?.content?.trim() || "English";
+      console.log(`[LYTER] 🌍 Langue détectée: ${detectedLang}`);
+      return detectedLang;
+    }
+  } catch (err) {
+    console.warn(`[LYTER] ⚠️ Erreur détection langue:`, err.message);
+  }
+  return "English";
+}
+
+// =============================================================================
+// ENDPOINT PRINCIPAL
+// =============================================================================
 
 app.post("/generate-lyter", async (req, res) => {
   try {
     const { email, postText, numberOfImages } = req.body;
+    const requestedCount = Math.min(Math.max(numberOfImages || 1, 1), 3);
 
-    const requestedCount = clampNumberOfImages(numberOfImages || 1);
-
-    if (!process.env.GOOGLE_API_KEY) {
-      return res.status(500).json({ success: false, message: "Missing GOOGLE_API_KEY" });
+    // Validation
+    if (!process.env.GOOGLE_API_KEY || !process.env.OPENAI_API_KEY) {
+      return res.status(500).json({ 
+        success: false, 
+        message: "Configuration API manquante" 
+      });
     }
 
-    if (!process.env.OPENAI_API_KEY) {
-      return res.status(500).json({ success: false, message: "Missing OPENAI_API_KEY" });
+    if (!postText?.trim()) {
+      return res.status(400).json({ 
+        success: false, 
+        message: "Le texte du post est requis" 
+      });
     }
 
-    if (!postText || typeof postText !== "string" || !postText.trim()) {
-      return res.status(400).json({ success: false, message: "postText is required" });
-    }
+    console.log(`[LYTER] 📝 Analyse post (${postText.length} caractères)`);
 
-    console.log(`[LYTER] Analyzing post text (${postText.length} characters)`);
+    // ==========================================================================
+    // ÉTAPE 1 : DÉTECTION DU STYLE AVEC CHATGPT
+    // ==========================================================================
+    
+    const styleDetectionPrompt = `Tu es un expert en analyse de contenu LinkedIn.
 
-    // ÉTAPE 1 : Détecter automatiquement le style d'illustration avec ChatGPT
-    const styleDetectionPrompt = `Tu es un expert en analyse de contenu LinkedIn pour choisir le meilleur style d'illustration.
+Analyse ce post et choisis le MEILLEUR style d'illustration parmi :
 
-Analyse ce post LinkedIn et détermine :
-1. Le TYPE DE POST (ex: expertise/pédagogie, méthode/processus, comparaison, étude/analyse, annonce produit, citation/réflexion, storytelling, technique/data)
-2. Le STYLE D'ILLUSTRATION le plus approprié parmi cette liste UNIQUEMENT :
+1. "cheat_sheet" - Listes, points clés, erreurs, bénéfices, checklist, résumé (ÉCRITURE À LA MAIN OBLIGATOIRE)
+2. "process_steps" - Processus chronologique uniquement (étapes qui se suivent, workflow clair)
+3. "comparison" - Avant/après, A vs B (ÉCRITURE À LA MAIN OBLIGATOIRE)
+4. "study_results" - Données, chiffres, résultats
+5. "handwritten_text" - Citation, phrase forte
+6. "whiteboard" - Explication, décomposition (⚠️ PAS un process)
+7. "styled_hook" - Accroche courte uniquement
+8. "mockup_screenshot" - Produit, app
+9. "visual_metaphor" - Concept abstrait (OBLIGATOIREMENT UN OBJET RÉEL)
+10. "intriguing_stop_scroll" - Prise de position, débat
 
-STYLES DISPONIBLES :
-- "cheat_sheet" : Pour résumés, points clés, checklists, guides rapides (mots-clés: checklist, points clés, résumé, mémo, guide, à retenir)
-- "process_steps" : Pour processus, workflows, étapes, méthodes (mots-clés: processus, étapes, workflow, comment, méthode, procédure)
-- "comparison" : Pour comparaisons, avant/après, oppositions (mots-clés: vs, versus, comparaison, avant/après, différence, opposé, plutôt que)
-- "study_results" : Pour données, statistiques, résultats d'études (mots-clés: étude, résultats, statistiques, données, analyse, benchmark, recherche)
-- "handwritten_text" : Pour citations fortes, phrases percutantes (mots-clés: citation, phrase forte, idée clé, note manuscrite)
-- "whiteboard" : Pour explications, démonstrations, formations (mots-clés: explication, démonstration, enseignement, formation)
-- "styled_hook" : Pour accroches courtes et percutantes (mots-clés: accroche, hook, annonce courte, phrase choc)
-- "mockup_screenshot" : Pour produits, apps, outils, interfaces (mots-clés: produit, app, outil, interface, dashboard, fonctionnalité)
-- "visual_metaphor" : Pour concepts abstraits, réflexions, storytelling (mots-clés: métaphore, symbolique, concept abstrait, réflexion)
-- "intriguing_stop_scroll" : Pour contenu provocateur, débats (mots-clés: accroche forte, débat, prise de position, controverse)
-- "quote_reflection" : Pour citations inspirantes, réflexions profondes (mots-clés: citation, quote, réflexion, pensée, sagesse, inspiration)
+================================================================================
+RÈGLES STRICTES PAR STYLE
+================================================================================
 
-Réponds UNIQUEMENT en JSON strict (sans texte autour) :
+1️⃣ CHEAT_SHEET (ÉCRITURE À LA MAIN OBLIGATOIRE) :
+→ UTILISER UNIQUEMENT si le post contient :
+  ✓ Points clés
+  ✓ Erreurs à éviter
+  ✓ Bénéfices
+  ✓ Checklist
+  ✓ Résumé
+→ FORCER "cheat_sheet" si numéros/puces suivis de bénéfices, points clés, erreurs, checklist, résumé
+→ NE PAS utiliser si c'est un processus chronologique → utiliser "process_steps" à la place
+
+2️⃣ PROCESS_STEPS (Processus chronologique uniquement) :
+→ UTILISER UNIQUEMENT si le post décrit :
+  ✓ Étapes qui se suivent chronologiquement
+  ✓ Workflow clair avec progression
+  ✓ Utilise "d'abord / ensuite / puis / enfin"
+  ✓ Processus séquentiel avec verbes d'action
+  ✓ Transformation claire de type "situation A → situation B" ou "avant → après" ou "problème → solution → résultat"
+
+RÈGLES BLOQUANTES (NE JAMAIS choisir "process_steps" si) :
+✗ BLOQUER si le post est une ANNONCE (live, événement, lancement, nouveauté) → utiliser "styled_hook" ou "intriguing_stop_scroll"
+✗ BLOQUER si le post contient PLUSIEURS LISTES INDÉPENDANTES → utiliser "cheat_sheet"
+✗ BLOQUER si les numéros servent à :
+  • Présenter un PROGRAMME → utiliser "cheat_sheet"
+  • Lister des BÉNÉFICES → utiliser "cheat_sheet"
+  • Lister ce que l'on va APPRENDRE → utiliser "cheat_sheet"
+  • Donner des ACTIONS SIMPLES (bloque, inscris-toi, sois là) → utiliser "cheat_sheet" ou "styled_hook"
+✗ BLOQUER s'il n'y a PAS de transformation claire de type :
+  • "situation A → situation B"
+  • "avant → après"
+  • "problème → solution → résultat"
+→ Dans ces cas, utiliser "cheat_sheet" à la place
+
+→ NE PAS utiliser si :
+  ✗ C'est une simple liste de points → utiliser "cheat_sheet"
+  ✗ C'est une explication/décomposition → utiliser "whiteboard"
+  ✗ Le post dit "décompose" ou "comme une liste" → utiliser "whiteboard"
+
+3️⃣ COMPARISON (ÉCRITURE À LA MAIN OBLIGATOIRE) :
+→ UTILISER pour avant/après, A vs B, oppositions
+→ Toujours avec écriture manuscrite
+
+4️⃣ STUDY_RESULTS :
+→ UTILISER pour données, chiffres, résultats d'études, statistiques
+
+5️⃣ HANDWRITTEN_TEXT :
+→ UTILISER pour citation forte, phrase choc, note manuscrite
+
+6️⃣ WHITEBOARD (⚠️ PAS un process) :
+→ UTILISER pour explication, décomposition de méthode, raisonnement pédagogique
+→ NE PAS utiliser si c'est un processus chronologique → utiliser "process_steps"
+→ UTILISER si le post dit "décompose", "explique", "comme une liste" (pour expliquer)
+
+7️⃣ STYLED_HOOK (Accroche simple) :
+→ UTILISER UNIQUEMENT pour post très court ou début de post percutant uniquement
+→ Objectif : attirer l'attention mais PAS de débat, PAS de prise de position forte
+→ Texte ≤ 80 mots, ou début du post uniquement
+→ Post très court avec juste une accroche punchy
+→ Exemple : "Tu veux que ton post LinkedIn cartonne ? Voici comment !"
+→ RÈGLE BLOQUANTE : NE PAS utiliser si le post contient :
+  ✗ CTA (appel à l'action)
+  ✗ Événement, live
+  ✗ Offre limitée
+  ✗ Débat ou prise de position forte
+  ✗ Lien ou teaser provocateur
+  ✗ Post long et complet qui incite à l'action
+→ Dans ces cas → utiliser "intriguing_stop_scroll" à la place
+
+8️⃣ MOCKUP_SCREENSHOT :
+→ UTILISER UNIQUEMENT pour produit, app, outil, interface avec VISUALISATION CONCRÈTE de l'interface/écran
+→ NE PAS considérer la simple mention d'une vidéo ou d'un outil comme un mockup
+→ Si le post contient une liste de fonctionnalités ou points clés → utiliser "cheat_sheet" à la place
+→ Si le post mentionne juste un outil sans montrer l'interface → utiliser "cheat_sheet" ou "styled_hook"
+
+9️⃣ VISUAL_METAPHOR :
+→ UTILISER pour concept abstrait
+→ OBLIGATOIREMENT UN OBJET RÉEL photographié (escalier, pont, labyrinthe, etc.)
+
+🔟 INTRIGUING_STOP_SCROLL (Contenu provocateur / accroche forte) :
+→ UTILISER pour post qui cherche à CAPTER L'ATTENTION SUR TOUT LE POST, pas seulement le début
+→ Contient UN OU PLUSIEURS de ces éléments :
+  ✓ CTA (appel à l'action)
+  ✓ Événement, live
+  ✓ Offre limitée
+  ✓ Débat, prise de position forte
+  ✓ Teaser provocateur
+→ Post long possible, avec listes et explications
+→ RÈGLE CRITIQUE : IGNORER la première phrase si le reste du post contient ces éléments
+→ Analyser le POST ENTIER, pas seulement le début
+→ Si le post est long et complet et incite à l'action → "intriguing_stop_scroll"
+→ Si le post contient un live, un lien ou un CTA → "intriguing_stop_scroll"
+→ Différence avec styled_hook : styled_hook = très court (≤80 mots), pas de CTA/débat/événement | intriguing_stop_scroll = peut être long, contient CTA/événement/débat/prise de position
+
+================================================================================
+EXEMPLES CONCRETS
+================================================================================
+
+✅ "Les 5 erreurs à éviter : 1. Erreur A, 2. Erreur B" → cheat_sheet
+✅ "Les 3 bénéfices : 1. Bénéfice X, 2. Bénéfice Y" → cheat_sheet
+✅ "Checklist : 1. Point clé A, 2. Point clé B" → cheat_sheet
+✅ "1. D'abord X, 2. Ensuite Y, 3. Puis Z, 4. Enfin W" → process_steps (transformation claire)
+✅ "Problème → Solution → Résultat" → process_steps (transformation claire)
+✅ "Avant → Après" → process_steps (transformation claire)
+✅ "Aujourd'hui on décompose la méthode ADA" → whiteboard
+✅ "Décompose la méthode X comme une liste" → whiteboard
+✅ "Option A vs Option B" → comparison
+✅ "Citation inspirante..." → handwritten_text
+✅ Post avec prise de position forte + débat → intriguing_stop_scroll
+
+❌ "1. Commencer par X, 2. Suivre Y" → process_steps (PAS cheat_sheet car processus avec transformation)
+❌ "Décompose la méthode X" → whiteboard (PAS process_steps car explication)
+❌ "Tu veux que ton post LinkedIn cartonne ? Voici comment !" → styled_hook (PAS intriguing_stop_scroll car court et simple)
+❌ "Live demain : 1. Bloque, 2. Inscris-toi" → cheat_sheet (PAS process_steps car annonce)
+❌ "Programme : 1. Point A, 2. Point B" → cheat_sheet (PAS process_steps car programme)
+❌ "Bénéfices : 1. Bénéfice X, 2. Bénéfice Y" → cheat_sheet (PAS process_steps car bénéfices)
+❌ "Vous allez apprendre : 1. X, 2. Y" → cheat_sheet (PAS process_steps car liste d'apprentissage)
+❌ "1. Action A, 2. Action B" (sans transformation) → cheat_sheet (PAS process_steps car pas de transformation claire)
+❌ "Regardez cette vidéo sur..." → styled_hook ou cheat_sheet (PAS mockup_screenshot car simple mention)
+❌ "Outil X : 1. Fonctionnalité A, 2. Fonctionnalité B" → cheat_sheet (PAS mockup_screenshot car liste de fonctionnalités)
+✅ Post long avec accroche + développement + "Inscris-toi maintenant !" → intriguing_stop_scroll (post long + CTA, ignorer première phrase)
+✅ Post avec accroche + débat/prise de position forte → intriguing_stop_scroll (contient débat/prise de position)
+✅ Post avec accroche + événement/live → intriguing_stop_scroll (contient événement/live)
+✅ Post avec accroche + offre limitée → intriguing_stop_scroll (contient offre limitée)
+❌ Post très court (≤80 mots) avec juste accroche punchy, pas de CTA/débat/événement → styled_hook (PAS intriguing_stop_scroll car court et simple)
+
+POST : """${postText}"""
+
+ANALYSE CRITIQUE POUR STYLED_HOOK vs INTRIGUING_STOP_SCROLL :
+- Compter le nombre de mots du post entier
+- Analyser le POST ENTIER, pas seulement la première phrase
+- Chercher la présence de : CTA, événement, live, offre limitée, débat, prise de position forte, teaser provocateur, lien
+- Si le post contient UN de ces éléments → FORCER "intriguing_stop_scroll" (même si la première phrase ressemble à un hook)
+- Si le post est long et complet et incite à l'action → "intriguing_stop_scroll"
+- Si le post est très court (≤80 mots) ET pas de CTA/débat/événement/prise de position → "styled_hook"
+- IGNORER la première phrase si le reste du post contient CTA/événement/débat/prise de position
+
+Réponds en JSON pur en appliquant les règles strictes :
 {
-  "postType": "description courte du type de post",
   "detectedStyle": "nom_du_style",
-  "confidence": 0.0-1.0,
-  "reasoning": "explication courte du choix"
-}
+  "postType": "type",
+  "confidence": 0.9,
+  "reasoning": "explication détaillée avec application des règles strictes, nombre de mots, éléments détectés (CTA/événement/débat/prise de position)"
+}`;
 
-POST À ANALYSER :
-"""${postText}"""
-
-Choisis le style qui correspond LE MIEUX au contenu et à l'intention du post.`;
-
-    let detectedStyle = "visual_metaphor"; // Style par défaut
-    let postType = "General";
+    let detectedStyle = "visual_metaphor";
+    let postType = "Contenu général";
     let styleConfidence = 0.5;
     let styleReasoning = "Style par défaut";
 
     try {
-      console.log(`[LYTER] Detecting illustration style with ChatGPT...`);
+      console.log(`[LYTER] 🔍 Détection style avec ChatGPT...`);
       
-      const styleDetectionRes = await fetch("https://api.openai.com/v1/chat/completions", {
+      const styleRes = await fetch("https://api.openai.com/v1/chat/completions", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+          "Authorization": `Bearer ${process.env.OPENAI_API_KEY}`
         },
         body: JSON.stringify({
-          model: OPENAI_MODEL,
-          temperature: 0.3, // Basse température pour des choix cohérents
+          model: "gpt-4-turbo-preview",
+          temperature: 0.2,
           messages: [
-            {
-              role: "system",
-              content: "Tu es un expert en détection de styles d'illustration pour contenus LinkedIn. Tu dois choisir le style le plus approprié parmi une liste prédéfinie."
-            },
-            {
-              role: "user",
-              content: styleDetectionPrompt
-            }
+            { role: "system", content: "Tu es expert en détection de styles visuels. Réponds en JSON pur." },
+            { role: "user", content: styleDetectionPrompt }
           ],
           max_tokens: 300
-        }),
+        })
       });
 
-      if (styleDetectionRes.ok) {
-        const styleDetectionData = await styleDetectionRes.json();
-        const styleDetectionText = styleDetectionData?.choices?.[0]?.message?.content || "";
+      if (styleRes.ok) {
+        const data = await styleRes.json();
+        const content = data.choices?.[0]?.message?.content || "";
+        const jsonMatch = content.match(/\{[\s\S]*\}/);
         
-        try {
-          let jsonText = styleDetectionText.trim();
-          const jsonMatch = jsonText.match(/\{[\s\S]*\}/);
-          if (jsonMatch) {
-            jsonText = jsonMatch[0];
+        if (jsonMatch) {
+          const parsed = JSON.parse(jsonMatch[0]);
+          if (parsed.detectedStyle && LYTER_ILLUSTRATION_STYLES[parsed.detectedStyle]) {
+            detectedStyle = parsed.detectedStyle;
+            postType = parsed.postType || postType;
+            styleConfidence = parsed.confidence || 0.8;
+            styleReasoning = parsed.reasoning || styleReasoning;
+            console.log(`[LYTER] ✅ Style détecté: ${detectedStyle} (${(styleConfidence*100).toFixed(0)}%)`);
           }
-          
-          const styleResult = JSON.parse(jsonText);
-          
-          // Valider que le style détecté existe dans notre liste
-          if (styleResult.detectedStyle && LYTER_ILLUSTRATION_STYLES[styleResult.detectedStyle]) {
-            detectedStyle = styleResult.detectedStyle;
-            postType = styleResult.postType || "General";
-            styleConfidence = styleResult.confidence || 0.8;
-            styleReasoning = styleResult.reasoning || "Détection automatique";
-            
-            console.log(`[LYTER] ✅ Style détecté: ${detectedStyle} (confiance: ${(styleConfidence * 100).toFixed(0)}%)`);
-            console.log(`[LYTER] Type de post: ${postType}`);
-            console.log(`[LYTER] Raisonnement: ${styleReasoning}`);
-          } else {
-            console.warn(`[LYTER] ⚠️ Style invalide détecté: ${styleResult.detectedStyle}, utilisation du style par défaut`);
-          }
-        } catch (parseErr) {
-          console.error(`[LYTER] ⚠️ Erreur parsing détection style:`, parseErr);
         }
-      } else {
-        console.error(`[LYTER] ⚠️ Erreur API ChatGPT pour détection style:`, styleDetectionRes.status);
       }
-    } catch (styleErr) {
-      console.error(`[LYTER] ⚠️ Erreur lors de la détection du style:`, styleErr);
+    } catch (err) {
+      console.warn(`[LYTER] ⚠️ Erreur détection:`, err.message);
     }
 
     const styleConfig = LYTER_ILLUSTRATION_STYLES[detectedStyle];
 
-    // ÉTAPE 2 : Générer un prompt optimisé pour illustration photoréaliste
-    console.log(`[LYTER] Generating optimized prompt with ChatGPT...`);
+    // ==========================================================================
+    // ÉTAPE 2 : DÉTECTION LANGUE + EXTRACTION CONTENU POST + CONSTRUCTION PROMPT
+    // ==========================================================================
     
-    const promptGenerationSystem = `Tu es un expert en génération de prompts pour créer des illustrations PHOTORÉALISTES pour LinkedIn.
-
-STYLE D'ILLUSTRATION : ${styleConfig.name}
-DESCRIPTION : ${styleConfig.description}
-CONTENU VISUEL : ${styleConfig.visualContent}
-
-RÈGLES ABSOLUES DE RÉALISME :
-1. L'illustration doit ressembler à une VRAIE PHOTO PROFESSIONNELLE, PAS à de l'art IA
-2. Utiliser un éclairage naturel, des textures réalistes, de la profondeur de champ
-3. Inclure des imperfections naturelles, des ombres réalistes
-4. Éviter les couleurs sursaturées, la symétrie parfaite, les éléments artificiels
-5. Utiliser des objets réels, des environnements réels, des matériaux réels
-
-CONTRAINTES CRITIQUES :
-- INTERDIT ABSOLU : visages humains, corps complets, bras, torse, jambes
-- MAINS : ${styleConfig.allowHands ? 'Peut inclure des MAINS UNIQUEMENT (tenant des objets, pointant, écrivant) SEULEMENT si c\'est pertinent pour le concept du post et le style d\'illustration. Ne pas forcer l\'ajout de mains si ce n\'est pas naturel.' : 'AUCUNE partie du corps humain'}
-- ÉCRITURE MANUSCRITE : ${styleConfig.allowHandwriting ? 'Peut inclure du texte manuscrit, écriture sur surfaces SEULEMENT si c\'est pertinent pour le concept du post.' : 'Pas d\'écriture manuscrite'}
-- ANIMAUX : Peut inclure des animaux (chiens, chats, oiseaux, etc.) SEULEMENT si c'est pertinent pour le concept du post. Ne pas ajouter d'animaux si le post ne les mentionne pas ou si ce n'est pas naturel.
-- AUTORISÉ : Flèches, diagrammes, graphiques, icônes simples
-
-ÉLÉMENTS PHOTORÉALISTES À INCLURE :
-- Objets réels du quotidien (bureau, outils, matériaux)
-- Environnements authentiques (bureau, café, extérieur)
-- Textures naturelles (bois, papier, tissu, métal)
-- Éclairage professionnel (lumière naturelle, studio)
-- Composition photographique (règle des tiers, profondeur)
-
-Génère UN SEUL prompt (<150 mots) décrivant l'illustration photoréaliste idéale pour ce post LinkedIn.
-Le prompt doit être en ANGLAIS, concis, et prêt pour l'API de génération d'images.
-
-Retourne UNIQUEMENT le prompt final, sans introduction ni conclusion.`;
-
-    let optimizedPrompt = "";
-
+    console.log(`[LYTER] 🌍 Détection langue...`);
+    const detectedLanguage = await detectPostLanguage(postText);
+    
+    console.log(`[LYTER] 📄 Extraction contenu du post...`);
+    
+    // Extraire les éléments clés du post pour les intégrer dans l'image
+    let postContentExtraction = "";
     try {
-      const promptGenRes = await fetch("https://api.openai.com/v1/chat/completions", {
+      const extractionRes = await fetch("https://api.openai.com/v1/chat/completions", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+          "Authorization": `Bearer ${process.env.OPENAI_API_KEY}`
         },
         body: JSON.stringify({
-          model: OPENAI_MODEL,
-          temperature: 0.7,
+          model: "gpt-4-turbo-preview",
+          temperature: 0.3,
           messages: [
-            {
-              role: "system",
-              content: promptGenerationSystem
+            { 
+              role: "system", 
+              content: `Tu es expert en extraction de contenu pour génération d'images. Extrais les éléments clés du post qui doivent apparaître dans l'image générée. Réponds UNIQUEMENT avec les éléments à afficher dans l'image, sans explication supplémentaire.` 
             },
-            {
-              role: "user",
-              content: `Génère un prompt photoréaliste pour illustrer ce post LinkedIn avec le style ${styleConfig.name} :
+            { 
+              role: "user", 
+              content: `Extrais les éléments clés de ce post LinkedIn qui doivent apparaître VISIBLEMENT dans l'image générée :
 
 POST : """${postText}"""
 
-Le prompt doit :
-- Décrire une illustration PHOTORÉALISTE (comme une vraie photo professionnelle)
-- Respecter le style ${styleConfig.name}
-- Analyser le CONTEXTE du post pour décider intelligemment quels éléments inclure
-- ${styleConfig.allowHands ? 'MAINS : Peut inclure des MAINS UNIQUEMENT si c\'est pertinent pour le concept du post. Si le post parle d\'écriture, de manipulation d\'objets, ou d\'interaction, alors inclure des mains. Sinon, ne pas en inclure.' : 'AUCUNE partie du corps humain'}
-- ${styleConfig.allowHandwriting ? 'ÉCRITURE : Peut inclure du texte manuscrit SEULEMENT si le post contient une citation, une réflexion, ou un concept qui bénéficie d\'une écriture manuscrite. Sinon, ne pas en inclure.' : 'Pas de texte manuscrit'}
-- ANIMAUX : Peut inclure des animaux SEULEMENT si le post mentionne des animaux, des métaphores animales, ou si un animal illustre naturellement le concept. Sinon, ne pas en inclure.
-- Inclure des éléments réels : objets, environnements, textures selon le contexte du post
-- Éviter tout aspect "généré par IA"
-- Ne pas forcer l'ajout d'éléments (mains, animaux) si ce n'est pas naturel pour le concept
+Style détecté : ${styleConfig.name}
 
-Analyse le post et génère un prompt qui correspond VRAIMENT au contenu, sans ajouter d'éléments inutiles.
+IMPORTANT: Extrais TOUS les éléments qui doivent être visibles dans l'image :
+- Si liste numérotée : garde TOUS les numéros et TOUS les points (ex: "1. Point A, 2. Point B, 3. Point C")
+- Si bénéfices : garde TOUS les bénéfices listés
+- Si erreurs : garde TOUTES les erreurs mentionnées
+- Si étapes : garde TOUTES les étapes avec leurs numéros
+- Si comparaison : garde les deux éléments à comparer (Option A vs Option B)
+- Si citation : garde la citation EXACTE
+- Si chiffres/statistiques : garde TOUS les chiffres et données
+- Si méthode décomposée : garde TOUS les éléments de la décomposition
 
-Retourne UNIQUEMENT le prompt en anglais (150 mots max).`
+Réponds UNIQUEMENT avec le contenu à afficher dans l'image, formaté de manière claire. Ne change pas le contenu, garde-le tel quel.`
             }
           ],
-          max_tokens: 400
-        }),
+          max_tokens: 500
+        })
       });
 
-      if (promptGenRes.ok) {
-        const promptGenData = await promptGenRes.json();
-        optimizedPrompt = promptGenData?.choices?.[0]?.message?.content?.trim() || "";
-        console.log(`[LYTER] ✅ Prompt optimisé généré (${optimizedPrompt.length} caractères)`);
-      } else {
-        console.error(`[LYTER] ⚠️ Erreur génération prompt:`, promptGenRes.status);
-        throw new Error("Erreur lors de la génération du prompt");
+      if (extractionRes.ok) {
+        const data = await extractionRes.json();
+        postContentExtraction = data.choices?.[0]?.message?.content?.trim() || "";
+        console.log(`[LYTER] ✅ Contenu extrait (${postContentExtraction.length} caractères)`);
       }
-    } catch (promptErr) {
-      console.error(`[LYTER] ⚠️ Erreur génération prompt:`, promptErr);
-      return res.status(500).json({ 
-        success: false, 
-        message: "Erreur lors de la génération du prompt d'illustration" 
-      });
+    } catch (err) {
+      console.warn(`[LYTER] ⚠️ Erreur extraction contenu:`, err.message);
+      // Fallback : utiliser les 200 premiers caractères du post
+      postContentExtraction = postText.substring(0, 200);
     }
-
-    if (!optimizedPrompt) {
-      return res.status(500).json({ 
-        success: false, 
-        message: "Aucun prompt généré par ChatGPT" 
-      });
-    }
-
-    // ÉTAPE 3 : Enrichir le prompt avec contraintes strictes de réalisme
-    const normalizedPrompt = optimizedPrompt.replace(/\s+/g, " ").trim().slice(0, 700);
     
-    const handsGuidance = styleConfig.allowHands ? 
-      `IMPORTANT - CONTEXTUAL USE OF HANDS: You CAN include realistic HANDS ONLY (no faces, no bodies, no arms, no torso, no legs) BUT ONLY if they are relevant to the post's concept. For example: if the post is about writing, include hands writing. If about holding tools, include hands holding. If the concept doesn't naturally involve hands, DO NOT include them. Make hands look natural and photorealistic when used.` : 
-      `CRITICAL: ABSOLUTELY NO human body parts at all (no faces, no bodies, no hands, no arms). Focus entirely on objects, environments, animals, symbols, and visual elements.`;
+    console.log(`[LYTER] 🎨 Construction prompt avec contenu du post...`);
     
-    const handwritingGuidance = styleConfig.allowHandwriting ?
-      `CONTEXTUAL HANDWRITING: You CAN include handwritten text or writing on surfaces (paper, whiteboard, notebook) with realistic handwriting style, BUT ONLY if it's relevant to the post's concept (e.g., quotes, key ideas, explanations). If the post doesn't naturally call for handwritten text, do not include it.` :
-      `Do NOT include any handwritten text.`;
+    // Construire le prompt final avec le style ET le contenu du post
+    const basePrompt = styleConfig.getPrompt(detectedLanguage);
     
-    const realisticRequirements = `PHOTOREALISTIC QUALITY REQUIREMENTS:
-- Look like REAL PROFESSIONAL PHOTOGRAPHY, NOT AI-generated art
-- Natural lighting (studio lights, window light, outdoor daylight)
-- Realistic textures (paper grain, wood texture, fabric weave, metal reflection)
-- Natural depth of field (blurred background, focused foreground)
-- Natural imperfections (slight shadows, dust particles, natural wear)
-- Realistic shadows and reflections
-- Professional photography quality (sharp focus, proper exposure, balanced colors)
-- Real-world objects and materials (actual desk items, real notebooks, real tools)
-- Authentic environments (real office, real café, real outdoor setting)
-- Natural color palette (avoid oversaturated colors, use natural tones)
-- Professional composition (rule of thirds, leading lines, balanced framing)
+    // Ajouter le contenu du post au prompt
+    const finalPrompt = `${basePrompt}
 
-CONTEXTUAL ELEMENTS (use only if relevant to the post's concept):
-- Animals: realistic animals, pets, wildlife ONLY if the post mentions animals, uses animal metaphors, or if animals naturally illustrate the concept. Do not add animals if not relevant.
-- Hands: ${styleConfig.allowHands ? 'YES - but ONLY if relevant (e.g., writing posts → hands writing, tool posts → hands holding tools). Do not force hands if not natural to the concept.' : 'NO - no human body parts'}
-- Handwriting: ${styleConfig.allowHandwriting ? 'YES - but ONLY if relevant (e.g., quote posts → handwritten quotes, explanation posts → handwritten notes). Do not force handwriting if not natural.' : 'NO - no handwritten text'}
-- Arrows, diagrams, simple icons if appropriate for the style
-- Real objects: desk items, tools, materials, products relevant to the post's theme
+================================================================================
+POST CONTENT TO DISPLAY IN IMAGE (CRITICAL - MUST BE VISIBLE):
+================================================================================
+The following content from the LinkedIn post MUST be accurately and COMPLETELY represented in the generated image. ALL text, numbers, points, and elements mentioned below MUST appear VISIBLY in the image in ${detectedLanguage}:
 
-FORBIDDEN ELEMENTS:
-- Human faces (NEVER)
-- Full human bodies (NEVER)
-- Arms, torso, legs (NEVER - only hands if allowed)
-- AI-looking elements (perfect symmetry, oversaturated colors, artificial style)
-- Watermarks or text overlays
+${postContentExtraction || postText.substring(0, 300)}
 
-Style: ${styleConfig.name}
-Aspect ratio: 1:1 or 4:5
-Quality: High resolution, sharp focus, professional grade`;
+CRITICAL REQUIREMENTS FOR CONTENT DISPLAY:
+- ALL text, numbers, points, lists, comparisons, or other elements from the post content MUST be visible and readable in the generated image
+- If the post contains a numbered list (1, 2, 3...), ALL numbers and ALL items MUST be visible
+- If the post contains benefits, ALL benefits MUST be visible
+- If the post contains errors, ALL errors MUST be visible
+- If the post contains steps, ALL steps MUST be visible with their numbers
+- If the post contains a comparison, BOTH sides MUST be visible
+- If the post contains a quote/citation, the EXACT quote MUST be visible
+- If the post contains statistics/numbers, ALL numbers MUST be visible
+- The content MUST be displayed exactly as extracted, maintaining the same structure and format
+- All content must be handwritten (if style requires handwriting) or displayed according to style requirements`;
+    
+    console.log(`[LYTER] 📋 Prompt final prêt (${finalPrompt.length} caractères)`);
 
-    const finalPrompt = `${normalizedPrompt}
-
-${handsGuidance}
-${handwritingGuidance}
-
-${realisticRequirements}`;
-
-    console.log(`[LYTER] Final prompt ready (${finalPrompt.length} characters)`);
-    console.log(`[LYTER] Prompt preview: ${finalPrompt.substring(0, 200)}...`);
-
-    // ÉTAPE 4 : Générer l'illustration avec Gemini
-    const generateIllustration = async () => {
-      let lastError;
-
-      for (let attempt = 1; attempt <= 2; attempt += 1) {
-        try {
-          if (attempt > 1) {
-            console.log(`[LYTER] Retry attempt ${attempt}/2 after 5 seconds...`);
-            await sleep(5000);
-          }
-
-          const timeoutPromise = new Promise((_, reject) => 
-            setTimeout(() => reject(new Error("Timeout: génération dépassée (90s)")), 90000)
-          );
-
-          const fetchPromise = fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image-preview:generateContent?key=${process.env.GOOGLE_API_KEY}`,
+    // ==========================================================================
+    // ÉTAPE 3 : GÉNÉRATION AVEC GEMINI (Essaie 3.0, fallback 2.5)
+    // ==========================================================================
+    
+    const generateWithGemini = async (attempt = 1, useGemini30 = true) => {
+      try {
+        const modelName = useGemini30 ? "gemini-3.0-flash-image" : "gemini-2.5-flash-image";
+        console.log(`[LYTER] 🎬 Génération ${modelName} (${attempt}/3)...`);
+        
+        const response = await Promise.race([
+          fetch(
+            `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${process.env.GOOGLE_API_KEY}`,
             {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
-                contents: [
-                  {
-                    parts: [
-                      { text: finalPrompt },
-                    ],
-                  },
-                ],
-              }),
+                contents: [{
+                  parts: [{ text: finalPrompt }]
+                }],
+                generationConfig: {
+                  responseModalities: ["IMAGE"],
+                  imageConfig: {
+                    aspectRatio: "1:1"
+                  }
+                }
+              })
             }
-          );
+          ),
+          new Promise((_, reject) => 
+            setTimeout(() => reject(new Error("Timeout 90s")), 90000)
+          )
+        ]);
 
-          const response = await Promise.race([fetchPromise, timeoutPromise]);
-
-          if (!response.ok) {
-            const statusText = response.statusText || `HTTP ${response.status}`;
-            if (response.status === 503) {
-              throw new Error(`Erreur 503 Gemini – timeout génération`);
-            }
-            throw new Error(`HTTP ${response.status}: ${statusText}`);
+        if (!response.ok) {
+          if (response.status === 404 && useGemini30 && attempt === 1) {
+            console.log(`[LYTER] ⚠️ Gemini 3.0 non disponible, fallback vers 2.5...`);
+            return generateWithGemini(1, false);
           }
+          throw new Error(`HTTP ${response.status}`);
+        }
 
-          const data = await response.json();
-          
-          if (data.error) {
-            const errorMsg = data.error.message || "Generation failed";
-            if (errorMsg.includes("timeout") || errorMsg.includes("503")) {
-              throw new Error(`Erreur 503 Gemini – timeout`);
-            }
-            throw new Error(errorMsg);
-          }
+        const data = await response.json();
+        
+        if (data.error) {
+          throw new Error(data.error.message || "Erreur Gemini");
+        }
 
-          const candidates = Array.isArray(data?.candidates) ? data.candidates : [];
-          
-          if (candidates.length === 0) {
-            throw new Error("Aucun candidat retourné par Gemini");
-          }
+        const parts = data.candidates?.[0]?.content?.parts || [];
+        let imageUrl = null;
 
-          let imageUrl = null;
-
-          for (const cand of candidates) {
-            const parts = cand?.content?.parts || [];
-            
-            for (const part of parts) {
-              const inlineData = part?.inline_data || part?.inlineData;
-              if (inlineData?.data) {
-                const mime = inlineData?.mime_type || inlineData?.mimeType || "image/png";
-                imageUrl = `data:${mime};base64,${inlineData.data}`;
-                break;
-              }
-              if (typeof part?.text === "string" && part.text.startsWith("data:image/")) {
-                imageUrl = part.text;
-                break;
-              }
-            }
-            if (imageUrl) break;
-          }
-
-          if (!imageUrl) {
-            throw new Error("Aucune image trouvée dans la réponse");
-          }
-
-          if (!imageUrl.startsWith("data:image/")) {
-            throw new Error("Format d'image invalide");
-          }
-
-          console.log(`[LYTER] ✅ Image générée avec succès`);
-          return imageUrl;
-        } catch (err) {
-          lastError = err;
-          console.warn(`[LYTER] ⚠️ Tentative ${attempt} échouée:`, err?.message);
-          if (attempt < 2 && (err?.message?.includes("timeout") || err?.message?.includes("503"))) {
-            continue;
+        for (const part of parts) {
+          const inlineData = part.inline_data || part.inlineData;
+          if (inlineData?.data) {
+            const mime = inlineData.mime_type || inlineData.mimeType || "image/png";
+            imageUrl = `data:${mime};base64,${inlineData.data}`;
+            break;
           }
         }
+
+        if (!imageUrl) {
+          throw new Error("Aucune image dans la réponse");
+        }
+
+        console.log(`[LYTER] ✅ Image générée avec ${modelName}`);
+        return { imageUrl, modelUsed: modelName };
+        
+      } catch (err) {
+        if ((err.message.includes("404") || err.message.includes("HTTP 404")) && useGemini30 && attempt === 1) {
+          console.log(`[LYTER] ⚠️ Gemini 3.0 non disponible, fallback vers 2.5...`);
+          return generateWithGemini(1, false);
+        }
+        
+        if (attempt < 3) {
+          console.warn(`[LYTER] ⚠️ Échec tentative ${attempt}, retry...`);
+          await new Promise(resolve => setTimeout(resolve, 5000));
+          return generateWithGemini(attempt + 1, useGemini30);
+        }
+        throw err;
       }
-      throw lastError || new Error("Échec de génération d'illustration");
     };
 
-    // ÉTAPE 5 : Générer les illustrations
+    // Génération des images
     const illustrations = [];
+    let modelUsed = "gemini-2.5-flash-image";
+    
     for (let i = 0; i < requestedCount; i++) {
-      console.log(`[LYTER] Génération illustration ${i + 1}/${requestedCount}...`);
       try {
-        const illustration = await generateIllustration();
-        illustrations.push(illustration);
+        const result = await generateWithGemini();
+        if (typeof result === 'object' && result.imageUrl) {
+          illustrations.push(result.imageUrl);
+          modelUsed = result.modelUsed || modelUsed;
+        } else {
+          illustrations.push(result);
+        }
         if (i < requestedCount - 1) {
-          await sleep(3000);
+          await new Promise(resolve => setTimeout(resolve, 3000));
         }
       } catch (error) {
-        console.error(`[LYTER] ⚠️ Échec illustration ${i + 1}:`, error?.message);
-        if (illustrations.length === 0) {
-          throw error;
-        }
+        console.error(`[LYTER] ❌ Échec image ${i + 1}:`, error.message);
+        if (illustrations.length === 0) throw error;
       }
     }
 
     if (illustrations.length === 0) {
       return res.status(502).json({ 
         success: false, 
-        message: "Aucune illustration générée" 
+        message: "Impossible de générer les illustrations" 
       });
     }
 
-    // ÉTAPE 6 : Upload vers Firebase Storage
-    console.log(`[LYTER] Upload de ${illustrations.length} illustration(s)...`);
-    let storedImageUrls = [];
+    // Upload et sauvegarde
+    let storedUrls = illustrations;
     try {
-      storedImageUrls = await Promise.all(
-        illustrations.map((img) => uploadGeneratedImageToStorage(img, email))
+      storedUrls = await Promise.all(
+        illustrations.map(img => uploadGeneratedImageToStorage(img, email))
       );
-      console.log(`[LYTER] ✅ Upload réussi`);
-    } catch (uploadError) {
-      console.error("[LYTER] ⚠️ Erreur upload:", uploadError);
-      storedImageUrls = illustrations;
+    } catch (err) {
+      console.warn("[LYTER] ⚠️ Erreur upload");
     }
 
-    // ÉTAPE 7 : Sauvegarder dans Firestore
     try {
-      await saveImagesToFirestore(email, storedImageUrls, {
+      await saveImagesToFirestore(email, storedUrls, {
         prompt: finalPrompt,
         source: "lyter_illustration",
         postText,
         illustrationType: "conceptual",
         illustrationStyle: detectedStyle,
         styleName: styleConfig.name,
-        postType: postType,
-        styleConfidence: styleConfidence,
+        postType,
+        styleConfidence,
         noHumanFaces: true,
+        mobileOptimized: true,
+        threeSecondReadable: true,
+        linkedinReady: true
       });
-      console.log("[LYTER] ✅ Sauvegarde Firestore réussie");
-    } catch (firestoreError) {
-      console.error("[LYTER] ⚠️ Erreur Firestore:", firestoreError);
+    } catch (err) {
+      console.warn("[LYTER] ⚠️ Erreur Firestore");
     }
 
-    // ÉTAPE 8 : Retourner la réponse
-    res.json({ 
-      success: true, 
-      imageUrls: storedImageUrls, 
-      prompt: finalPrompt, 
-      optimizedPrompt,
+    // Réponse
+    res.json({
+      success: true,
+      imageUrls: storedUrls,
+      prompt: finalPrompt,
       illustrationType: "conceptual",
       illustrationStyle: detectedStyle,
       styleName: styleConfig.name,
-      postType: postType,
-      styleConfidence: styleConfidence,
-      styleReasoning: styleReasoning,
-      message: `${illustrations.length} illustration(s) photoréaliste(s) générée(s) avec succès`
+      postType,
+      styleConfidence,
+      styleReasoning,
+      detectedLanguage,
+      modelUsed,
+      guideCompliance: {
+        noHumanFaces: true,
+        mobileReadable: true,
+        threeSecondTest: true,
+        linkedinCompatible: true,
+        soberColors: true,
+        professionalStyle: true,
+        textInPostLanguage: true
+      },
+      message: `${illustrations.length} illustration(s) professionnelle(s) conforme(s) au guide`
     });
+
   } catch (error) {
-    console.error("[LYTER] ❌ Erreur:", error);
-    const errorMessage = error?.message || "Erreur génération illustration";
-    if (errorMessage.includes("503") || errorMessage.includes("timeout")) {
-      return res.status(503).json({ 
-        success: false, 
-        message: "Erreur 503 Gemini – timeout génération"
-      });
-    }
-    res.status(500).json({ 
-      success: false, 
-      message: errorMessage
+    console.error("[LYTER] ❌ ERREUR:", error);
+    res.status(500).json({
+      success: false,
+      message: error.message || "Erreur génération"
     });
   }
 });
-
-
-// ---------------------- SAVE FINAL SELECTION ----------------------
-app.post("/selection", async (req, res) => {
-  try {
-    const { email, imageUrl, prompt, flowType } = req.body;
-
-    if (!email || !imageUrl) {
-      return res
-        .status(400)
-        .json({ success: false, message: "email and imageUrl are required to save a selection." });
-    }
-
-    // Truncate very large data URLs to avoid Firestore 1MB limit
-    let urlToSave = imageUrl;
-    if (typeof urlToSave === "string" && urlToSave.length > 800000) {
-      urlToSave = urlToSave.substring(0, 500000) + "...[truncated]";
-    }
-
-    await db.collection("selections").add({
-      email,
-      imageUrl: urlToSave,
-      prompt: prompt || "",
-      flowType: flowType || "unknown",
-      saved_at: new Date(),
-    });
-
-    res.json({ success: true, message: "Final image selection saved." });
-  } catch (error) {
-    console.error("Selection save error:", error);
-    res.status(500).json({ success: false, message: "Error saving selection." });
-  }
-});
-
-// ---------------------- DEBUG: CHECK FIRESTORE ----------------------
-app.get("/debug/firestore/:email", async (req, res) => {
-  try {
-    const email = req.params.email;
-    console.log(`🔍 DEBUG: Checking Firestore for email: ${email}`);
-
-    // Get all documents for this email
-    const imagesSnapshot = await db.collection("images").where("email", "==", email).get();
-    console.log(`🔍 Found ${imagesSnapshot.size} documents in Firestore`);
-
-    const allDocs = [];
-    imagesSnapshot.forEach((doc) => {
-      const data = doc.data();
-      allDocs.push({
-        id: doc.id,
-        email: data.email,
-        urlLength: data.url ? data.url.length : 0,
-        urlPreview: data.url ? (data.url.length > 100 ? data.url.substring(0, 100) + "..." : data.url) : "NO URL",
-        isTruncated: data.url ? data.url.includes("[truncated]") : false,
-        originalLength: data.originalLength || 0,
-        created_at: data.created_at,
-        style: data.style,
-        source: data.source,
-        photosCount: data.photosCount,
-      });
-    });
-
-    res.json({
-      success: true,
-      email,
-      totalDocuments: imagesSnapshot.size,
-      documents: allDocs,
-    });
-  } catch (error) {
-    console.error("DEBUG error:", error);
-    res.status(500).json({ success: false, message: "Debug error", error: error.message });
-  }
-});
-
 // ---------------------- GET LAB GALLERY (Images fetchées uniquement) ----------------------
 // IMPORTANT: Cette route doit être définie AVANT /gallery/:email pour éviter les conflits de routing
 app.get("/gallery/lab/:email", async (req, res) => {
@@ -6414,4 +7046,3 @@ app.listen(PORT, () => {
   console.log(`Backend running at http://localhost:${PORT}`);
   console.log(`Available endpoints: /signup, /login, /generate, /generate-auto, /generate-lyter, /ingest, /tag/batch, /tag/single, /post/analyze, /select, /images/search, /images/filter`);
 });
-

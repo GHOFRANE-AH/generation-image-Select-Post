@@ -3,6 +3,10 @@ import React, { useState, useEffect } from "react";
 import "./App.css";
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
 
+
+
+
+
 // Fonction utilitaire pour gérer les réponses JSON de manière sécurisée
 const safeJsonParse = async (response) => {
   // Vérifier que la réponse est OK
@@ -148,56 +152,78 @@ function App() {
 
   // Predefined posts for Lyter Mode - Conceptual illustrations
   // Predefined posts for Lyter Mode - Conceptual illustrations
-const predefinedLyterPosts = [
-  {
-    id: "expertise_pedagogie",
-    title: "Expertise / Pedagogy Post",
-    text: "After mentoring dozens of beginners in data science, I’ve noticed a recurring pattern: many rush into machine learning without truly understanding their dataset.\n\nHere’s the advice I always give:\n\n📚 Start by exploring your data: structure, anomalies, patterns\n\n📊 Visualize before modeling — a chart often reveals what code hides\n\n🔍 Ask the right analytical questions before choosing an algorithm\n\n💡 Practice on real-world datasets, not only tutorials\n\nGreat data scientists aren’t defined by the number of algorithms they know, but by how deeply they understand their data.\n\nWhat was your biggest learning moment in data science?",
-  },
-
-  {
-    id: "methode_process",
-    title: "Method / Process Post",
-    text: "Here’s my simple workflow to create consistent LinkedIn content without stress:\n\n1️⃣ Choose 3 core themes that represent your expertise\n\n2️⃣ Brainstorm 10 post ideas for each theme\n\n3️⃣ Write everything in one focused session\n\n4️⃣ Schedule the posts for the next two weeks\n\n5️⃣ Spend 10 minutes daily replying to comments\n\nThis system keeps me consistent without relying on inspiration.\n\nDo you follow a structured process for your content?",
-  },
-
-  {
-    id: "comparaison_opinion",
-    title: "Comparison / Opinion Post",
-    text: "After years of switching between remote work and office life, here’s what I’ve learned:\n\n🏠 Remote work\n+ More flexibility\n+ More personal time\n+ Better focus\n- Less spontaneous interaction\n- Can feel isolating\n\n🏢 Office work\n+ Stronger team connection\n+ Faster collaboration\n+ Clearer boundaries\n- Commute fatigue\n- More interruptions\n\nFor me, hybrid remains the perfect balance.\n\nWhat work environment helps you perform best?",
-  },
-
-  {
-    id: "etude_analyse",
-    title: "Study / Analysis Post",
-    text: "I reviewed 1,000 LinkedIn posts to understand what truly drives engagement.\n\nHere are the most surprising insights:\n\n📈 Posts ending with a question get 3x more comments\n\n🖼️ Visual content boosts reach by 150%\n\n⏰ Best posting window: Tuesday–Thursday, 8–10 AM\n\n✍️ Posts under 1,500 characters perform better\n\n📚 Personal stories outperform generic advice\n\nThe conclusion is simple: authenticity wins.\n\nWhich insight resonates most with you?",
-  },
-
-  {
-    id: "annonce_produit",
-    title: "Product Announcement Post",
-    text: "🚀 Big news: Lyter is evolving!\n\nWe’re releasing a redesigned version built for speed, clarity, and creativity.\n\nHere’s what’s new:\n\n⚡ Smarter AI content suggestions\n\n📊 A refreshed analytics dashboard\n\n🎨 Advanced tone and style customization\n\n🔗 More integrations to simplify your workflow\n\nThis update marks a major step forward.\n\nWhich feature are you most excited to try?",
-  },
-
-  {
-    id: "citation_reflexion",
-    title: "Quote / Reflection Post",
-    text: "“Start where you are, with what you have.”\n\nThis sentence stayed with me all week.\n\nI’ve postponed several projects waiting for the “perfect moment”.\n\nBut the truth is: perfection never arrives.\n\nProgress begins with a single imperfect step.\n\nToday, I decided to stop waiting.\n\nWhat could you start today, even imperfectly?",
-  },
-
-  {
-    id: "storytelling_abstrait",
-    title: "Abstract Storytelling Post",
-    text: "This morning, walking under the rain, something clicked.\n\nEach drop felt like a reminder of ideas I had left aside.\n\nWe accumulate projects like clouds: quietly, slowly.\n\nThen suddenly, one moment unlocks everything.\n\nProgress rarely comes in a straight line — it comes in waves.\n\nWhat small idea is guiding you today?",
-  },
-
-  {
-    id: "technique_data",
-    title: "Technical / Data Post",
-    text: "Here’s a quick data insight from analyzing 50,000 LinkedIn posts:\n\n📈 Strong hooks increase engagement by 40%\n\n📸 Posts with visuals nearly double interactions\n\n⏱️ Morning posts get more comments\n\n🔢 List-style posts are read more fully\n\nThe data confirms what we feel intuitively: clarity wins.\n\nWhat’s your best tip for boosting engagement?",
-  },
-];
-
+  const predefinedLyterPosts = [
+    // 1. Cheat Sheet / Infographie pédagogique
+    {
+      id: "cheat_sheet",
+      title: "Cheat Sheet / Key Insights Post",
+      text: "I’ve spent the last 5 years helping teams level up their skills.\n\nAnd honestly, 80% of the progress comes from mastering a few fundamentals.\n\nSo j’ai résumé les 5 règles qui reviennent toujours :\n\n📌 Focus on one skill at a time\n📌 Practice deliberately, not randomly\n📌 Track your progress weekly\n📌 Ask for feedback early\n📌 Teach what you learn\n\nSimple. Basique. Mais redoutablement efficace.\n\nIf you want the full cheat sheet, just comment “sheet”."
+    },
+  
+    // 2. Process / Étapes
+    {
+      id: "process_steps",
+      title: "Process / Step-by-Step Post",
+      text: "People often ask me how I structure a project from scratch.\n\nHere’s the exact 5‑step process I use every single time:\n\n1️⃣ Define the outcome\n2️⃣ Map the steps backward\n3️⃣ Identify blockers\n4️⃣ Execute in small batches\n5️⃣ Review and adjust\n\nIt looks simple, but it removes 90% of the chaos.\n\nWhat step do you struggle with the most?"
+    },
+  
+    // 3. Comparaison
+    {
+      id: "comparison",
+      title: "Comparison Post",
+      text: "I’ve tested both approaches for years: planning everything vs. improvising.\n\n🧠 Planning\n+ Clear direction\n+ Better prioritization\n- Can feel rigid\n\n🔥 Improvising\n+ More creativity\n+ More adaptability\n- Easy to lose focus\n\nTruth is: the best strategy is often a mix of both.\n\nWhich one fits you best?"
+    },
+  
+    // 4. Étude / Analyse
+    {
+      id: "study_analysis",
+      title: "Study / Analysis Post",
+      text: "I analyzed 500 high‑performing LinkedIn creators.\n\nHere’s what they all had in common:\n\n📈 They post consistently (not necessarily daily)\n🧩 They mix personal stories with expertise\n🎯 They speak to ONE clear audience\n📸 They use visuals to simplify complex ideas\n\nNo hacks. No secrets.\nJust clarity and discipline.\n\nWhich insight surprises you the most?"
+    },
+  
+    // 5. Texte manuscrit
+    {
+      id: "handwritten_note",
+      title: "Handwritten Note Post",
+      text: "Today, I wrote something on a piece of paper that hit me hard:\n\n“Discipline beats motivation.”\n\nI’ve been waiting for inspiration for weeks.\nBut inspiration doesn’t build anything.\nHabits do.\n\nSo here’s the note I pinned above my desk.\nMaybe it will help you too.\n\nWhat’s the sentence you need to hear today?"
+    },
+  
+    // 6. Tableau / Explication
+    {
+      id: "whiteboard_explanation",
+      title: "Whiteboard / Explanation Post",
+      text: "I grabbed a marker and wrote the simplest formula for progress on my whiteboard:\n\nConsistency × Focus × Time = Results\n\nNothing fancy.\nJust the truth we forget too often.\n\nI took a picture of the board — feel free to save it.\n\nWhat would you add to this equation?"
+    },
+  
+    // 7. Accroche stylisée
+    {
+      id: "stylized_hook",
+      title: "Stylized Hook Post",
+      text: "“If you don’t tell your story, someone else will tell it for you.”\n\nI turned this sentence into a visual hook today.\nBecause sometimes, one powerful line is enough to shift your mindset.\n\nWhat’s the sentence that drives you right now?"
+    },
+  
+    // 8. Mockup / Capture d’écran stylisée
+    {
+      id: "mockup_showcase",
+      title: "Mockup / Product Showcase Post",
+      text: "We just redesigned one of our most-used features.\nAnd honestly… it changes everything.\n\nI’ve added a clean mockup so you can see exactly what’s new:\n\n⚡ Faster navigation\n🎨 Cleaner UI\n📊 Smarter insights\n🔗 Better integrations\n\nIf you want early access, drop a “demo” below."
+    },
+  
+    // 9. Métaphore visuelle
+    {
+      id: "visual_metaphor",
+      title: "Visual Metaphor Post",
+      text: "Growing your career is like climbing a staircase.\n\nYou don’t jump to the top.\nYou take one step.\nThen another.\nThen another.\n\nSome steps are easy.\Some are painful.\nBut every step counts.\n\nI created a visual metaphor to remind you of that.\n\nWhich step are you on today?"
+    },
+  
+    // 10. Image intrigante / Stop Scroll
+    {
+      id: "stop_scroll",
+      title: "Stop Scroll / Intriguing Post",
+      text: "I created an image today that makes absolutely no sense.\nAnd yet… it tells a story.\n\nWhy ?\nBecause on LinkedIn, the first battle is attention.\nIf you don’t stop the scroll, you don’t exist.\n\nSo here’s a visual designed to make you pause.\n\nTell me the first thing you noticed."
+    }
+  ];
+  
   
   const [numberOfImages, setNumberOfImages] = useState(3);
   const [loading, setLoading] = useState(false);
@@ -251,8 +277,79 @@ const predefinedLyterPosts = [
     }
   };
 
+  // ---------------- COMPRESS IMAGE ----------------
+  const compressImage = (originalFile, targetSizeKB = 120, maxWidth = 1280, maxHeight = 1280) => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+          // Calculer les nouvelles dimensions en conservant le ratio
+          let width = img.width;
+          let height = img.height;
+          
+          // Réduire les dimensions si nécessaire
+          if (width > maxWidth || height > maxHeight) {
+            const ratio = Math.min(maxWidth / width, maxHeight / height);
+            width = Math.round(width * ratio);
+            height = Math.round(height * ratio);
+          }
+
+          // Créer un canvas et redessiner l'image
+          const canvas = document.createElement('canvas');
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          
+          // Améliorer la qualité du redimensionnement
+          ctx.imageSmoothingEnabled = true;
+          ctx.imageSmoothingQuality = 'high';
+          ctx.drawImage(img, 0, 0, width, height);
+
+          // Fonction récursive pour compresser jusqu'à atteindre la taille cible
+          const compressWithQuality = (currentQuality) => {
+            canvas.toBlob(
+              (blob) => {
+                if (!blob) {
+                  reject(new Error('Erreur lors de la compression'));
+                  return;
+                }
+
+                const sizeKB = blob.size / 1024;
+                
+                // Si la taille est acceptable (avec une marge de sécurité de 10KB)
+                if (sizeKB <= targetSizeKB + 10 || currentQuality <= 0.3) {
+                  const compressedFile = new File([blob], originalFile.name || 'compressed.jpg', {
+                    type: 'image/jpeg',
+                    lastModified: Date.now(),
+                  });
+                  console.log(`✓ Image compressée: ${sizeKB.toFixed(2)}KB (qualité: ${(currentQuality * 100).toFixed(0)}%)`);
+                  resolve(compressedFile);
+                  return;
+                }
+
+                // Réduire la qualité progressivement
+                const newQuality = Math.max(0.3, currentQuality - 0.1);
+                compressWithQuality(newQuality);
+              },
+              'image/jpeg',
+              currentQuality
+            );
+          };
+
+          // Commencer avec une qualité modérée
+          compressWithQuality(0.75);
+        };
+        img.onerror = reject;
+        img.src = e.target.result;
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(originalFile);
+    });
+  };
+
   // ---------------- UPLOAD PHOTOS ----------------
-  const handleUpload = (event) => {
+  const handleUpload = async (event) => {
     const files = Array.from(event.target.files);
     const maxPhotos = flowType === "auto" ? 2 : 10;
 
@@ -261,7 +358,33 @@ const predefinedLyterPosts = [
       return;
     }
 
-    setPhotos([...photos, ...files]);
+    // Compresser toutes les images avant de les ajouter
+    try {
+      const compressedFiles = await Promise.all(
+        files.map(async (file) => {
+          const sizeKB = file.size / 1024;
+          
+          // Compresser toutes les images au-dessus de 120KB pour garantir qu'elles restent sous 150KB
+          if (sizeKB > 120) {
+            console.log(`📦 Compression de l'image: ${file.name} (${sizeKB.toFixed(2)}KB)`);
+            const compressed = await compressImage(file, 120); // Cible: 120KB
+            const compressedSizeKB = compressed.size / 1024;
+            console.log(`✅ Compressée à: ${compressed.name} (${compressedSizeKB.toFixed(2)}KB)`);
+            return compressed;
+          } else {
+            console.log(`✓ Image déjà optimale: ${file.name} (${sizeKB.toFixed(2)}KB)`);
+            return file; // Pas besoin de compression
+          }
+        })
+      );
+
+      setPhotos([...photos, ...compressedFiles]);
+    } catch (error) {
+      console.error('Erreur lors de la compression:', error);
+      alert('Erreur lors de la compression des images. Tentative avec les images originales...');
+      // Fallback: utiliser les fichiers originaux en cas d'erreur
+      setPhotos([...photos, ...files]);
+    }
   };
 
   const handleDeletePhoto = (index) => {
@@ -1188,25 +1311,25 @@ const predefinedLyterPosts = [
                   className={flowType === "style" ? "active" : ""}
                   onClick={() => setFlowType("style")}
                 >
-                  Predefined style mode
+                 Mode Select
                 </button>
                 <button
                   className={flowType === "auto" ? "active" : ""}
                   onClick={() => setFlowType("auto")}
                 >
-                  Mode auto-prompt (texte + selfies)
+                  Mode Post 
                 </button>
                 <button
                   className={flowType === "lab" ? "active" : ""}
                   onClick={() => setFlowType("lab")}
                 >
-                  Lab
+                  Mode Lab
                 </button>
                 <button
                   className={flowType === "lyter" ? "active" : ""}
                   onClick={() => setFlowType("lyter")}
                 >
-                  Lyter Mode (Conceptual Illustration)
+                   Mode Lyter 
                 </button>
               </div>
 
@@ -1725,7 +1848,7 @@ const predefinedLyterPosts = [
               )}
 
               <div className="images-count">
-                <h4>🖼️ Nombre d'images</h4>
+                <h4>🖼️ Number of images to generate</h4>
                 <select
                   value={flowType === "auto" ? 2 : numberOfImages}
                   onChange={(e) => setNumberOfImages(Math.min(Math.max(parseInt(e.target.value, 10), 1), 4))}
